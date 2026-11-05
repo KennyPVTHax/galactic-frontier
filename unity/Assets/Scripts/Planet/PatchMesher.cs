@@ -13,13 +13,15 @@ namespace GF.Planet
         public int[] Tris;
         public double MinR, MaxR, HalfSize;
         public int Quads;
+        public byte[] Col;      // RGBA painted layer weights per vertex (null when nothing is painted)
+        public float[] Ovr;     // paint override strength per vertex
     }
 
     public static class PatchMesher
     {
         public const int DefaultQuads = 32;
 
-        public static PatchMeshData Build(PatchId id, double radius, IPlanetField field, int N = DefaultQuads, bool parallel = true)
+        public static PatchMeshData Build(PatchId id, double radius, IPlanetField field, int N = DefaultQuads, bool parallel = true, GF.Authoring.IPaintSource paint = null)
         {
             var (u0, u1, v0, v1) = id.Range();
             int E = N + 1;                                   // core grid only
@@ -93,7 +95,28 @@ namespace GF.Planet
                     Tri(tris, c0, k0, c1, flip); Tri(tris, c1, k0, k1, flip);
                 }
 
-            return new PatchMeshData { Id = id, Center = center, Pos = pos, Nrm = nrm, Tris = tris.ToArray(), MinR = minR, MaxR = maxR, HalfSize = arc * 0.75, Quads = N };
+            byte[] col = null; float[] ovrA = null;
+            if (paint != null && paint.Any)
+            {
+                col = new byte[total * 4]; ovrA = new float[total];
+                bool any = false;
+                for (int j = 0; j < side; j++)
+                    for (int i = 0; i < side; i++)
+                    {
+                        paint.Sample(Dir[j * E + i], out byte q0, out byte q1, out byte q2, out byte q3, out float o);
+                        int k = j * side + i; col[k * 4] = q0; col[k * 4 + 1] = q1; col[k * 4 + 2] = q2; col[k * 4 + 3] = q3; ovrA[k] = o; if (o > 0) any = true;
+                    }
+                // skirt vertices copy their border vertex
+                for (int t = 0; t < side; t++)
+                {
+                    CopyPaint(col, ovrA, core + 0 * side + t, 0 * side + t);
+                    CopyPaint(col, ovrA, core + 1 * side + t, N * side + t);
+                    CopyPaint(col, ovrA, core + 2 * side + t, t * side + 0);
+                    CopyPaint(col, ovrA, core + 3 * side + t, t * side + N);
+                }
+                if (!any) { col = null; ovrA = null; }
+            }
+            return new PatchMeshData { Col = col, Ovr = ovrA, Id = id, Center = center, Pos = pos, Nrm = nrm, Tris = tris.ToArray(), MinR = minR, MaxR = maxR, HalfSize = arc * 0.75, Quads = N };
         }
 
         /// <summary>Normal from a stencil defined only by the surface direction, so every patch (and face) computes the same value for the same point.</summary>
@@ -107,6 +130,8 @@ namespace GF.Planet
             return n.Dot(d) < 0 ? -n : n;
         }
         static Vec3d Pt(IPlanetField f, double radius, Vec3d d) => d * (radius + f.Height(d));
+
+        static void CopyPaint(byte[] col, float[] ovr, int dst, int src) { for (int q = 0; q < 4; q++) col[dst * 4 + q] = col[src * 4 + q]; ovr[dst] = ovr[src]; }
 
         static void Skirt(float[] pos, float[] nrm, int dst, int srcK, Vec3d center, Vec3d[] P, Vec3d[] Dir, int E, int ei, int ej, double depth)
         {

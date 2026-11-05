@@ -17,6 +17,9 @@ namespace GF.Planet
         const double QuarterPi = Math.PI / 4.0;
 
         public static Vec3d FaceNormal(int face) => N[face];
+        public static Vec3d FaceU(int face) => U[face];
+        public static Vec3d FaceV(int face) => V[face];
+        public static double UnwarpPublic(double c) => Unwarp(c);
 
         static double Warp(double t) => Math.Tan(t * QuarterPi);
         static double Unwarp(double c) => Math.Atan(c) / QuarterPi;

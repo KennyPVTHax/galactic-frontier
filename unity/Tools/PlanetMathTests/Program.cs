@@ -155,6 +155,7 @@ static class Program
         Console.WriteLine($"INFO global relief {mn:F1} .. {mx:F1} m");
         Check(mx < 700 && mn > -120, "global relief is within plausible bounds");
 
+        fails += AuthoringTests.Run(planet);
         Console.WriteLine(fails == 0 ? "ALL PASS" : $"{fails} FAILED");
         return fails == 0 ? 0 : 1;
     }
