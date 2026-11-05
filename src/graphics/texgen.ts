@@ -200,3 +200,32 @@ export function grey(height: Float32Array, size: number, lo = 0, hi = 1): Pixels
   }
   return out;
 }
+
+/**
+ * Molten lava (sRGB RGBA, tileable): dark cooling crust plates split by bright
+ * veins, with hotter pools. Used as an emissive map on lava liquids.
+ */
+export function lavaTexture(size: number, seed = 23): Pixels {
+  const warp = periodicFbm(seed, 4, 3);
+  const veins = periodicFbm(seed + 5, 6, 4);
+  const pools = periodicFbm(seed + 9, 3, 3);
+  const cells = periodicWorley(seed + 13, 10);
+  const out = new Uint8ClampedArray(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const u = x / size, v = y / size;
+      const w = warp(u, v);
+      const n = veins(u + (w - 0.5) * 0.12, v - (w - 0.5) * 0.12);
+      const vein = clamp01(1 - Math.abs(n - 0.5) * 16);
+      const cell = clamp01(cells(u, v) * 1.6);
+      const pool = clamp01((pools(u, v) - 0.56) * 5);
+      const heat = clamp01(vein * 0.9 + pool * 0.8 + cell * cell * 0.25);
+      const i = (y * size + x) * 4;
+      // Crust → orange → yellow-white.
+      out[i] = (0.12 + heat * 0.88) * 255;
+      out[i + 1] = (0.03 + heat * heat * 0.62) * 255;
+      out[i + 2] = (0.02 + heat * heat * heat * 0.32) * 255;
+      out[i + 3] = 255;
+    }
+  return out;
+}

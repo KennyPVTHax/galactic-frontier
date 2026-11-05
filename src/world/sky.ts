@@ -29,6 +29,12 @@ uniform vec3 planetDir;
 uniform float time;
 uniform float starAmount;
 uniform float cloudAmount;
+uniform float cloudLo;
+uniform vec3 cloudTint;
+uniform vec3 giantA;
+uniform vec3 giantB;
+uniform vec3 ringColor;
+uniform float flash;
 
 float hash13(vec3 p) {
   p = fract(p * 0.1031);
@@ -114,7 +120,7 @@ void main() {
     vec2 rq = vec2(p.x * 0.96 + p.y * 0.28, (p.y * 0.96 - p.x * 0.28) / 0.18);
     float rd = length(rq);
     float rings = smoothstep(0.115, 0.12, rd) * smoothstep(0.19, 0.18, rd) * (0.55 + 0.45 * sin(rd * 420.0));
-    vec3 ringCol = vec3(0.85, 0.72, 0.95) * rings * 0.55;
+    vec3 ringCol = ringColor * rings * 0.55;
     bool front = (p.y * 0.96 - p.x * 0.28) < 0.0;
     if (!front) col = mix(col, col + ringCol, 1.0);
     if (rr < R) {
@@ -123,7 +129,7 @@ void main() {
       vec3 L = normalize(vec3(0.6, 0.35, 0.7));
       float lit = clamp(dot(n, L), 0.0, 1.0) * 0.9 + 0.08;
       float bands = sin(p.y / R * 14.0 + vnoise(vec3(p * 60.0, 1.0)) * 2.0);
-      vec3 base = mix(vec3(0.36, 0.55, 0.78), vec3(0.62, 0.48, 0.82), bands * 0.5 + 0.5);
+      vec3 base = mix(giantA, giantB, bands * 0.5 + 0.5);
       vec3 pc = base * lit;
       float edge = smoothstep(R, R * 0.96, rr);
       col = mix(col, pc + horizonColor * 0.12, edge * 0.92);
@@ -135,10 +141,13 @@ void main() {
   if (cloudAmount > 0.0 && h > 0.0) {
     vec2 cp = d.xz / (h + 0.08) * 1.6 + vec2(time * 0.004, time * 0.0025);
     float c = vnoise(vec3(cp * 1.1, 0.5)) * 0.55 + vnoise(vec3(cp * 2.7, 1.7)) * 0.3 + vnoise(vec3(cp * 6.1, 3.1)) * 0.15;
-    c = smoothstep(0.52, 0.85, c) * smoothstep(0.0, 0.18, h) * cloudAmount;
-    vec3 cloudCol = mix(horizonColor * 1.1, sunColor, pow(sd, 4.0) * 0.8) * (0.8 + 0.4 * up);
+    c = smoothstep(cloudLo, 0.85, c) * smoothstep(0.0, 0.18, h) * cloudAmount;
+    vec3 cloudCol = mix(horizonColor * 1.1, sunColor, pow(sd, 4.0) * 0.8) * (0.8 + 0.4 * up) * cloudTint;
     col = mix(col, cloudCol, c * 0.55);
   }
+
+  // Storm lightning (0 on calm worlds).
+  col += (horizonColor * 0.6 + vec3(0.35)) * flash * (0.35 + 0.65 * up);
 
   // Below horizon: dark ground haze
   col = mix(col, groundColor, smoothstep(0.0, -0.08, h));
@@ -152,14 +161,31 @@ export interface SkyColors {
   sun: Color3;
 }
 
+/** Per-planet sky extras. Every default reproduces the Veyra-7 (M2) sky exactly. */
+export interface SkyOptions {
+  /** Cloud amount shown even when the tier disables clouds (0 = Veyra-7 behaviour). */
+  baseClouds?: number;
+  /** Cloud coverage 0..1 (0.5 = M2). */
+  cloudCover?: number;
+  cloudTint?: Color3;
+  giantA?: Color3;
+  giantB?: Color3;
+  ring?: Color3;
+  /** Direction to the ringed gas giant / black hole. */
+  giantDir?: Vector3;
+  holeDir?: Vector3;
+}
+
 export class Sky {
   readonly mesh: Mesh;
   readonly material: ShaderMaterial;
   private time = 0;
+  private readonly baseClouds: number;
 
-  constructor(scene: Scene, sunDir: Vector3, colors: SkyColors, starAmount = 0.75) {
+  constructor(scene: Scene, sunDir: Vector3, colors: SkyColors, starAmount = 0.75, opts: SkyOptions = {}) {
     Effect.ShadersStore["gfSkyVertexShader"] = VERT;
     Effect.ShadersStore["gfSkyFragmentShader"] = FRAG;
+    this.baseClouds = opts.baseClouds ?? 0;
     this.mesh = MeshBuilder.CreateSphere("gf-sky", { diameter: 2, segments: 24, sideOrientation: Mesh.BACKSIDE }, scene);
     this.mesh.infiniteDistance = true;
     this.mesh.isPickable = false;
@@ -170,7 +196,10 @@ export class Sky {
       { vertex: "gfSky", fragment: "gfSky" },
       {
         attributes: ["position"],
-        uniforms: ["worldViewProjection", "sunDir", "zenithColor", "horizonColor", "groundColor", "sunColor", "bhDir", "planetDir", "time", "starAmount", "cloudAmount"],
+        uniforms: [
+          "worldViewProjection", "sunDir", "zenithColor", "horizonColor", "groundColor", "sunColor", "bhDir", "planetDir", "time", "starAmount", "cloudAmount",
+          "cloudLo", "cloudTint", "giantA", "giantB", "ringColor", "flash",
+        ],
       },
     );
     this.material.backFaceCulling = false;
@@ -180,22 +209,38 @@ export class Sky {
     this.material.setColor3("horizonColor", colors.horizon);
     this.material.setColor3("groundColor", colors.ground);
     this.material.setColor3("sunColor", colors.sun);
-    this.material.setVector3("bhDir", new Vector3(-0.55, 0.42, 0.72).normalize());
-    this.material.setVector3("planetDir", new Vector3(0.75, 0.3, -0.58).normalize());
+    this.material.setVector3("bhDir", (opts.holeDir ?? new Vector3(-0.55, 0.42, 0.72)).normalizeToNew());
+    this.material.setVector3("planetDir", (opts.giantDir ?? new Vector3(0.75, 0.3, -0.58)).normalizeToNew());
     this.material.setFloat("starAmount", starAmount);
     this.material.setFloat("time", 0);
-    this.material.setFloat("cloudAmount", 0);
+    this.material.setFloat("cloudAmount", this.baseClouds);
+    this.material.setFloat("cloudLo", 0.77 - (opts.cloudCover ?? 0.5) * 0.5);
+    this.material.setColor3("cloudTint", opts.cloudTint ?? new Color3(1, 1, 1));
+    this.material.setColor3("giantA", opts.giantA ?? new Color3(0.36, 0.55, 0.78));
+    this.material.setColor3("giantB", opts.giantB ?? new Color3(0.62, 0.48, 0.82));
+    this.material.setColor3("ringColor", opts.ring ?? new Color3(0.85, 0.72, 0.95));
+    this.material.setFloat("flash", 0);
     this.mesh.material = this.material;
     this.mesh.renderingGroupId = 0;
     this.mesh.applyFog = false;
   }
 
   setClouds(on: boolean): void {
-    this.material.setFloat("cloudAmount", on ? 1 : 0);
+    this.material.setFloat("cloudAmount", on ? 1 : this.baseClouds);
+  }
+
+  /** Lightning flash brightness 0..1 (storm weather). */
+  setFlash(v: number): void {
+    this.material.setFloat("flash", v);
   }
 
   update(dt: number): void {
     this.time += dt;
     this.material.setFloat("time", this.time);
+  }
+
+  dispose(): void {
+    this.mesh.dispose();
+    this.material.dispose(true);
   }
 }

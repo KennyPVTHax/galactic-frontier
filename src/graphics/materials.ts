@@ -16,6 +16,11 @@ import { fabricHeight, groundAtlas, hullPanels, normalFromHeight, waterHeight, t
 
 // ------------------------------------------------------------------ textures
 
+/** Uploads RGBA pixels into a tiling, mip-mapped DynamicTexture (canvas-backed: survives context loss). */
+export function makeTexture(scene: Scene, name: string, px: Pixels, size: number, linear: boolean): DynamicTexture {
+  return upload(scene, name, px, size, linear);
+}
+
 function upload(scene: Scene, name: string, px: Pixels, size: number, linear: boolean): DynamicTexture {
   const t = new DynamicTexture(name, { width: size, height: size }, scene, true, Texture.TRILINEAR_SAMPLINGMODE);
   const ctx = t.getContext() as unknown as CanvasRenderingContext2D;
@@ -93,6 +98,8 @@ export interface WorldPluginOptions {
   atmosphere?: boolean;
   /** Treat vertex colours as sRGB in PBR (keeps M1 palette). */
   linearVertexColor?: boolean;
+  /** Terrain only: view-dependent snow/ice glints, 0..1 (Kryos). 0/absent = M2 shader. */
+  sparkle?: number;
 }
 
 /** Shared per-frame values for every world plugin. */
@@ -146,6 +153,16 @@ vec3 gfApply(vec3 base, vec3 pos, inout vec3 n) {
   pert += (vec3(0.0, nx.y, nx.x) * wx + vec3(nz.x, nz.y, 0.0) * (1.0 - wx)) * steep;
 #endif
   n = normalize(n + pert * gfTiling.w * max(fade, 0.25));
+#ifdef GF_SPARKLE
+  {
+    vec3 gfSp = floor(pos * 7.0);
+    float gfH1 = fract(sin(dot(gfSp, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    vec3 gfVd = normalize(vEyePosition.xyz - pos);
+    float gfTw = fract(gfH1 * 31.7 + dot(gfVd, vec3(5.3, 3.1, 4.7)));
+    float gfG = step(0.955, gfH1) * smoothstep(0.78, 1.0, gfTw) * (1.0 - steep) * clamp(1.0 - dist / 70.0, 0.0, 1.0);
+    col += vec3(gfG * gfRock.z * 1.8);
+  }
+#endif
   return col;
 }
 #endif
@@ -207,7 +224,7 @@ export class WorldPlugin extends MaterialPluginBase {
     opts: WorldPluginOptions,
     private readonly textures: SurfaceTextures,
   ) {
-    super(material, "GFWorld", 200, { GF_WORLD: false, GF_TERRAIN: false, GF_TRIPLANAR: false, GF_ATMOS: false, GF_WIND: false, GF_LINEARVC: false });
+    super(material, "GFWorld", 200, { GF_WORLD: false, GF_TERRAIN: false, GF_TRIPLANAR: false, GF_ATMOS: false, GF_WIND: false, GF_LINEARVC: false, GF_SPARKLE: false });
     this.opts = { ...opts };
     this.atmosOn = !!opts.atmosphere;
     this.triOn = !!opts.triplanar;
@@ -244,6 +261,7 @@ export class WorldPlugin extends MaterialPluginBase {
     d.GF_ATMOS = this.atmosOn;
     d.GF_WIND = (this.opts.wind ?? 0) > 0;
     d.GF_LINEARVC = this.isPbr && !!this.opts.linearVertexColor;
+    d.GF_SPARKLE = !!this.opts.terrain && (this.opts.sparkle ?? 0) > 0;
   }
 
   override getSamplers(samplers: string[]): void {
@@ -282,7 +300,7 @@ uniform vec3 gfSunCol;
     const U = WorldUniforms;
     ubo.updateVector4("gfTiling", U.tiling);
     ubo.updateVector4("gfParams", U.params);
-    this.rockVec.set(this.opts.rock ?? 0, this.opts.wind ?? 0, 0, 0);
+    this.rockVec.set(this.opts.rock ?? 0, this.opts.wind ?? 0, this.opts.sparkle ?? 0, 0);
     ubo.updateVector4("gfRock", this.rockVec);
     ubo.updateVector4("gfAtmos", U.atmos);
     ubo.updateVector4("gfSunDir", U.sunDir);
@@ -333,6 +351,12 @@ export interface Look {
   mapScale?: number;
   /** PBR image-based-light multiplier (default 0.9). Raised for the ship, which is mostly seen from its unlit back. */
   envIntensity?: number;
+  /**
+   * Caller-owned emissive map (e.g. a planet's lava texture). The library never
+   * disposes it. Standard: added on top of `emissive`; PBR: multiplied by `emissiveMapLevel`.
+   */
+  emissiveMap?: Texture;
+  emissiveMapLevel?: number;
   world?: WorldPluginOptions;
 }
 
@@ -355,6 +379,8 @@ export class MaterialLibrary {
   atmosphere = false;
   readonly all: GfMaterial[] = [];
   private bindings = new Map<GfMaterial, Set<AbstractMesh>>();
+  /** Texture views created by `view()` (they borrow another texture's GPU texture). */
+  private readonly views = new WeakSet<Texture>();
 
   constructor(
     private readonly scene: Scene,
@@ -377,6 +403,38 @@ export class MaterialLibrary {
     if (!set) this.bindings.set(m, (set = new Set()));
     set.add(mesh);
     mesh.material = this.current(m);
+  }
+
+  /**
+   * Frees a material made with `make()`: disposes its Standard/PBR instances and
+   * their texture views (never the shared SurfaceTextures or caller-owned maps)
+   * and forgets its bindings. Used by planets on warp so repeated planet
+   * transitions do not accumulate materials. Meshes still using it keep a
+   * disposed material, so dispose or rebind them first.
+   */
+  release(m: GfMaterial): void {
+    const i = this.all.indexOf(m);
+    if (i >= 0) this.all.splice(i, 1);
+    this.bindings.delete(m);
+    for (const mat of [m.std, m.pbr]) {
+      if (!mat) continue;
+      for (const t of mat.getActiveTextures()) if (this.views.has(t as Texture)) this.disposeView(t as Texture);
+      mat.dispose(true, false);
+    }
+    m.std = null;
+    m.pbr = null;
+  }
+
+  /** True when `t` is a library texture view (borrowed GPU texture). */
+  isView(t: unknown): boolean {
+    return this.views.has(t as Texture);
+  }
+
+  /** Disposes a texture view without releasing the GPU texture it borrows. */
+  disposeView(t: Texture): void {
+    this.views.delete(t);
+    (t as unknown as { _texture: unknown })._texture = null;
+    t.dispose();
   }
 
   current(m: GfMaterial): Material {
@@ -406,6 +464,7 @@ export class MaterialLibrary {
     if (L.emissive) s.emissiveColor = L.emissive.clone();
     if (L.alpha !== undefined) s.alpha = L.alpha;
     if (L.backFaceCulling === false) s.backFaceCulling = false;
+    if (L.emissiveMap) s.emissiveTexture = L.emissiveMap;
     if (L.world) new WorldPlugin(s, L.world, this.textures).setQuality(this.triplanar, this.atmosphere);
     this.applyMaps(m, s);
     return s;
@@ -420,6 +479,10 @@ export class MaterialLibrary {
     if (L.emissive) p.emissiveColor = L.emissive.toLinearSpace().scale(1.6);
     if (L.alpha !== undefined) p.alpha = L.alpha;
     if (L.backFaceCulling === false) p.backFaceCulling = false;
+    if (L.emissiveMap) {
+      p.emissiveTexture = L.emissiveMap;
+      p.emissiveColor = new Color3(1, 1, 1).scale(L.emissiveMapLevel ?? 1.6);
+    }
     p.environmentIntensity = L.envIntensity ?? 0.9;
     p.directIntensity = 1;
     if (L.world) new WorldPlugin(p, { linearVertexColor: !!L.vertexColors, ...L.world }, this.textures).setQuality(this.triplanar, this.atmosphere);
@@ -436,7 +499,15 @@ export class MaterialLibrary {
     t.gammaSpace = src.gammaSpace;
     t.anisotropicFilteringLevel = 8;
     t.level = level;
+    this.views.add(t);
     return t;
+  }
+
+  /** Assigns a texture slot, disposing the view it replaces (texture-size changes). */
+  private setSlot<T extends object>(mat: T, key: keyof T, t: Texture): void {
+    const old = mat[key] as unknown;
+    if (old && old !== t && this.views.has(old as Texture)) this.disposeView(old as Texture);
+    (mat as Record<keyof T, unknown>)[key] = t;
   }
 
   private applyMaps(m: GfMaterial, std = m.std ?? undefined, pbr = m.pbr ?? undefined): void {
@@ -446,25 +517,25 @@ export class MaterialLibrary {
     const sc = L.mapScale ?? 1;
     if (L.maps === "hull") {
       if (std) {
-        std.diffuseTexture = this.view(T.hullAlbedo, sc);
-        std.bumpTexture = this.view(T.hullNormal, sc, 0.6);
+        this.setSlot(std, "diffuseTexture", this.view(T.hullAlbedo, sc));
+        this.setSlot(std, "bumpTexture", this.view(T.hullNormal, sc, 0.6));
       }
       if (pbr) {
-        pbr.albedoTexture = this.view(T.hullAlbedo, sc);
-        pbr.metallicTexture = this.view(T.hullOrm, sc);
+        this.setSlot(pbr, "albedoTexture", this.view(T.hullAlbedo, sc));
+        this.setSlot(pbr, "metallicTexture", this.view(T.hullOrm, sc));
         pbr.useRoughnessFromMetallicTextureGreen = true;
         pbr.useMetallnessFromMetallicTextureBlue = true;
         pbr.useAmbientOcclusionFromMetallicTextureRed = true;
         pbr.metallic = L.metallic ?? 0.6;
         pbr.roughness = 1;
-        pbr.bumpTexture = this.view(T.hullNormal, sc, 0.7);
+        this.setSlot(pbr, "bumpTexture", this.view(T.hullNormal, sc, 0.7));
       }
     } else if (L.maps === "fabric") {
-      if (std) std.bumpTexture = this.view(T.fabricNormal, sc, 0.25);
-      if (pbr) pbr.bumpTexture = this.view(T.fabricNormal, sc, 0.3);
+      if (std) this.setSlot(std, "bumpTexture", this.view(T.fabricNormal, sc, 0.25));
+      if (pbr) this.setSlot(pbr, "bumpTexture", this.view(T.fabricNormal, sc, 0.3));
     } else if (L.maps === "water") {
       // Basic keeps M1's flat water: under Standard lighting the 256 px wave normals read as dark blotches.
-      if (pbr) pbr.bumpTexture = this.view(T.waterNormal, sc, 0.45);
+      if (pbr) this.setSlot(pbr, "bumpTexture", this.view(T.waterNormal, sc, 0.45));
     }
   }
 
