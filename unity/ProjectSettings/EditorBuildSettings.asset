@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/AetherionPlanet.unity
+    guid: b58ef9a9b6b2af0468570772d9abb1f0
+  - enabled: 1
     path: Assets/Scenes/Aetherion.unity
     guid: 71e6e550735f8014893a04ee1fa160ca
   m_configObjects:

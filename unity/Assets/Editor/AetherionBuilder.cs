@@ -42,11 +42,20 @@ namespace GF.EditorTools
         }
 
         // ------------------------------------------------------------------ render pipeline
-        static void ConfigureRenderPipeline()
+        internal static void ConfigureRenderPipeline()
         {
             PlayerSettings.colorSpace = ColorSpace.Linear;
             var asset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             if (asset == null) { Debug.LogWarning("[GF] No URP asset active; create the project from the Universal 3D template."); return; }
+            // The template's SSAO feature throws every frame in player builds when its resources are stripped; keep it off until
+            // SSAO is brought back deliberately (baked AO in textures + grass root darkening cover the look for now).
+            foreach (var guid in AssetDatabase.FindAssets("t:UniversalRendererData"))
+            {
+                var rd = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(AssetDatabase.GUIDToAssetPath(guid));
+                if (rd == null) continue;
+                foreach (var feat in rd.rendererFeatures)
+                    if (feat != null && feat.GetType().Name.Contains("ScreenSpaceAmbientOcclusion")) { feat.SetActive(false); EditorUtility.SetDirty(rd); }
+            }
             asset.supportsCameraDepthTexture = true;      // water depth / foam
             asset.supportsHDR = true;
             asset.msaaSampleCount = 4;
@@ -86,9 +95,9 @@ namespace GF.EditorTools
             return arr;
         }
 
-        static Color C(float[] c, float mul = 1f) => new Color(c[0] * mul, c[1] * mul, c[2] * mul, 1f);
+        internal static Color C(float[] c, float mul = 1f) => new Color(c[0] * mul, c[1] * mul, c[2] * mul, 1f);
 
-        static Material MakeMaterial(string name, string shader)
+        internal static Material MakeMaterial(string name, string shader)
         {
             string path = $"{Gen}/{name}.mat";
             var sh = Shader.Find(shader) ?? throw new Exception("shader not found: " + shader);
@@ -97,9 +106,9 @@ namespace GF.EditorTools
             return m;
         }
 
-        static PlanetData LoadPlanet() => PlanetData.FromJson(File.ReadAllText("Assets/GameData/aetherion.json"));
+        internal static PlanetData LoadPlanet() => PlanetData.FromJson(File.ReadAllText("Assets/GameData/aetherion.json"));
 
-        static Material BuildTerrainMaterial()
+        internal static Material BuildTerrainMaterial()
         {
             var p = LoadPlanet();
             var m = MakeMaterial("Aetherion_Terrain", "GF/Terrain");
@@ -130,7 +139,7 @@ namespace GF.EditorTools
             return m;
         }
 
-        static Material BuildWaterMaterial()
+        internal static Material BuildWaterMaterial()
         {
             var p = LoadPlanet();
             var m = MakeMaterial("Aetherion_Water", "GF/Water");

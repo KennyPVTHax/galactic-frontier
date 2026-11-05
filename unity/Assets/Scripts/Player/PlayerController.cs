@@ -19,7 +19,7 @@ namespace GF.Player
     /// Heightmap, i.e. the same surface that is rendered. The Animator is purely cosmetic and never feeds back
     /// into physics, so gameplay stays identical whatever the animation does.
     /// </summary>
-    public sealed class PlayerController : MonoBehaviour
+    public sealed class PlayerController : MonoBehaviour, IAstronautSource
     {
         const float WALK = 5.5f, SPRINT = 10f, JUMP_V = 6.8f, RADIUS = 0.4f;
 
@@ -43,6 +43,10 @@ namespace GF.Player
         public bool Aiming { get; private set; }
         public bool Landed { get; private set; }
         public float LandImpact { get; private set; }
+
+        float IAstronautSource.VerticalSpeed => Velocity.y;
+        bool IAstronautSource.Grounded => Grounded;
+        bool IAstronautSource.Jetting => Jetting;
 
         float sinceJump = 99, groundedTime;
 

@@ -39,7 +39,7 @@ namespace GF.Planet
             double beltMask = Smooth(0.05, 0.55, noise.Fbm(d.x * 1.7 + 40, d.y * 1.7, d.z * 1.7, 2));
             double hills = noise.Fbm(d.x * 38, d.y * 38 + 9, d.z * 38, 4);
             double fine = noise.Fbm(d.x * 310, d.y * 310, d.z * 310 + 21, 3);
-            return 8 + 55 * cont + 260 * Math.Max(0, belt - 0.42) * beltMask + 22 * hills + 2.6 * fine;
+            return -2 + 70 * cont + 260 * Math.Max(0, belt - 0.42) * beltMask + 22 * hills + 2.6 * fine;
         }
 
         public double Height(Vec3d dir)
