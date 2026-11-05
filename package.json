@@ -1,8 +1,8 @@
 {
   "name": "@orbitbtc/galactic-frontier",
-  "version": "0.2.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "OrbitBtc Galactic Frontier \u2014 standalone third-person 3D space exploration game module (Babylon.js + TypeScript).",
+  "description": "OrbitBtc Galactic Frontier — standalone third-person 3D space exploration game module (Babylon.js + TypeScript).",
   "type": "module",
   "main": "dist/lib/galactic-frontier.js",
   "types": "dist/types/index.d.ts",
@@ -27,7 +27,9 @@
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "node scripts/smoke-test.cjs",
     "test:m2": "node scripts/m2-validate.cjs",
-    "compare": "node scripts/m2-compare.cjs"
+    "compare": "node scripts/m2-compare.cjs",
+    "test:journey": "node scripts/journey-test.cjs",
+    "bench": "node scripts/benchmark.cjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.33.2"
