@@ -38,6 +38,11 @@ All run in headless Chromium against the real game. Assists are declared in each
 | `scripts/contracts-e2e.cjs escort` | "Lantern Run": freighter + 4-ship ambush; forced freighter loss → reset; real win; dock | **6/6** — freighter ended at full 320 hull |
 | `scripts/contracts-e2e.cjs boss` | "The Iron Choir": Threnody dreadnought on Noctaris | **9/9** — killed in 484 s, phases 1→2→3, all 8 hardpoints shot off, *Titanfall* unlocked, reward paid; **5 hull/shield top-ups (declared assist)** |
 
+**Known intermittent failure.** The station-defense E2E passed on CI for one commit, then timed out once in wave 2 on the next
+(7 min without clearing; the code change between them was unrelated). Four consecutive local runs passed (wave 2: 44–104 s) so the cause is **not
+yet identified**. The script now dumps every hostile's AI state/distance when a fight times out, and the test pilot chases a hostile that drifts
+beyond 520 m (a declared assist). If it recurs on CI, the log will show where the enemy was stuck; treat that as a possible AI bug until explained.
+
 Assists, so nothing is overstated: test hooks install upgrade levels and mark prerequisite contracts done; `aimAtTarget()` points the
 nose (mouse aiming at 1–5 fps is impractical); teleports skip the final approach to the dock; the escort failure is injected by
 destroying the freighter through the combat system's own damage path; the **boss run tops up hull/shield when the hull is low**

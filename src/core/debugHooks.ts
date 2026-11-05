@@ -110,6 +110,8 @@ export function installDebugHooks(g: any): void {
       const dx = aim.x - g.ship.x, dy = aim.y - g.ship.y, dz = aim.z - g.ship.z;
       g.ship.yaw = Math.atan2(dx, dz);
       g.ship.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+      // Test-pilot assist (declared in scripts/contracts-e2e.cjs): chase a hostile that has drifted out of weapon range.
+      if (Math.hypot(dx, dy, dz) > 520) g.ship.throttle = Math.max(g.ship.throttle, 0.9);
       return true;
     },
     spawnEncounter: (id: string) => g.spawnContractEncounter(id),

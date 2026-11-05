@@ -12,7 +12,8 @@
  * fire input (held mouse button). The player is NOT invulnerable and no outcome is injected.
  * What is assisted (listed so nothing is overstated):
  *   - setup: test hooks install upgrade levels and mark prerequisite contracts complete;
- *   - aiming: window.__GF.aimAtTarget() points the nose at the locked target (mouse aiming at 1–5 fps is impractical);
+ *   - aiming: window.__GF.aimAtTarget() points the nose at the locked target (mouse aiming at 1–5 fps is impractical)
+ *     and raises throttle to chase a hostile that has drifted more than 520 m away;
  *   - long travel: teleports skip the final approach to the docking pad;
  *   - the one forced event is the escort failure path, where an ally is destroyed on purpose (labelled below).
  */
@@ -85,6 +86,11 @@ async function fight(page, label, done, timeoutMs, onTick) {
     }
   }
   await page.mouse.up();
+  if (outcome === "timeout") {
+    // Evidence for diagnosing a stuck fight: where is every hostile and what is it doing?
+    const d = await page.evaluate(() => { const x = window.__GF.state(); return x.combat.enemies.map((e) => `${e.type}:${e.state}@${Math.round(Math.hypot(e.x - x.ship.x, e.y - x.ship.y, e.z - x.ship.z))}m(y${Math.round(e.y)})`).join(" ") + ` | ship y${Math.round(x.ship.y)} speed ${Math.round(x.ship.speed)} planet ${x.planet}`; });
+    console.log(`  [${label}] fight timed out; hostiles: ${d}`);
+  }
   return { outcome, ...log, seconds: Math.round((Date.now() - t0) / 1000) };
 }
 
