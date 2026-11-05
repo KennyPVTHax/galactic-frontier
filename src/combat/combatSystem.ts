@@ -121,6 +121,9 @@ export interface CombatSystemOptions {
   maxProjectiles?: number;
 }
 
+/** Boss hull-core collision radius as a fraction of its visual radius (hardpoints live in the ring outside it). */
+export const BOSS_CORE_FRACTION = 0.4;
+
 /** Player hit sphere (Wayfarer is ~10 m long). */
 export const PLAYER_RADIUS = 4.5;
 
@@ -619,7 +622,11 @@ export class CombatSystem {
             }
             if (hit) break;
           }
-          const t = segmentSphere(p.px - e.prev.x, p.py - e.prev.y, p.pz - e.prev.z, p.x - e.pos.x, p.y - e.pos.y, p.z - e.pos.z, e.def.radius + p.radius);
+          // Capital ships: hardpoints (generator spire, missile racks, turrets) sit INSIDE the visual bounding sphere,
+          // so a full-size body sphere swallowed every bolt before it could reach them and the generator (and with it
+          // the shield-break mechanic) was unreachable. Bolts therefore collide with a smaller hull core only.
+          const bodyR = e.boss ? e.def.radius * BOSS_CORE_FRACTION : e.def.radius;
+          const t = segmentSphere(p.px - e.prev.x, p.py - e.prev.y, p.pz - e.prev.z, p.x - e.pos.x, p.y - e.pos.y, p.z - e.pos.z, bodyR + p.radius);
           if (t >= 0) {
             this.damageEnemy(e, p.damage, lerpPoint(p, t), true, events);
             hit = true;

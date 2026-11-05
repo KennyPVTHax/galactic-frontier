@@ -261,8 +261,11 @@ export const ENEMY_TYPES: Record<EnemyTypeId, EnemyTypeDef> = {
     shield: 500,
     shieldRegen: 25,
     shieldDelay: 5,
-    armor: 4,
-    resistance: 0.3,
+    // M7: armor 4 / resistance 0.3 left pulse cannons (7-13 dmg) doing ~1-5 damage per hit, so the hull could not
+    // realistically be depleted. With the hardpoint-reach fix, 2 / 0.2 lets a fully upgraded pilot who breaks the
+    // shield spire win (median ~6 game-minutes) while body-only strafing still loses. See tests/combat.test.ts.
+    armor: 2,
+    resistance: 0.2,
     weapons: [],
     detectRange: 700,
     detectCone: Math.PI,

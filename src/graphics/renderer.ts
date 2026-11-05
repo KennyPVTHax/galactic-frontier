@@ -173,6 +173,18 @@ export class Renderer {
    * re-applies the current profile. Shadow generators and the reflection probe
    * belong to the old lights/sky and are rebuilt.
    */
+  /** Disposes the shadow generators and reflection probe bound to the current world's lights (call before disposing those lights). */
+  releaseWorld(): void {
+    this.csm?.dispose();
+    this.shadow?.dispose();
+    this.csm = null;
+    this.shadow = null;
+    this.probe?.dispose();
+    this.probe = null;
+    this.d.scene.environmentTexture = null;
+    this.envPoly = null;
+  }
+
   setWorld(w: RendererWorld): void {
     this.csm?.dispose();
     this.shadow?.dispose();

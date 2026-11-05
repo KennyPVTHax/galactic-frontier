@@ -152,3 +152,58 @@ test("performance: 30 enemies with live projectiles stay well inside a frame bud
   const per = (performance.now() - t0) / N;
   assert.ok(per < 2, `${per.toFixed(3)} ms per update`);
 });
+
+// ---------------------------------------------------------------------------------------------- dreadnought (M7)
+import { DEFAULT_PLAYER_STATS } from "../src/combat/combatSystem";
+import { deriveStats, sanitizeLevels } from "../src/gameplay/upgrades";
+
+function bossFight(seed: number, levels: Record<string, number>, maxSeconds: number) {
+  const st = deriveStats(sanitizeLevels(levels));
+  const c = new CombatSystem({ seed });
+  c.setPlayerStats({ maxShield: st.shield.max, shieldRegen: st.shield.regenPerSec, shieldDelay: st.shield.regenDelay, weaponDamage: DEFAULT_PLAYER_STATS.weaponDamage * st.weapon.damageScale, fireInterval: DEFAULT_PLAYER_STATS.fireInterval * st.weapon.intervalScale });
+  let hull = st.maxHull;
+  let p = { x: 0, y: 300, z: 0 };
+  const DT20 = 1 / 20;
+  const fr = (f: { x: number; y: number; z: number }, v: { x: number; y: number; z: number }, fire: boolean) => c.update(DT20, { ...p, vx: v.x, vy: v.y, vz: v.z, forward: f, alive: hull > 0, protected: false }, { fire, cycleTarget: false, aimDir: f }, ENV);
+  fr({ x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 0 }, false);
+  c.spawnEncounter("dreadnought_boss", p, { difficulty: 5 });
+  const boss = c.boss()!;
+  let generatorDownAt = -1, minShieldAfterGen = Infinity, ang = 0, t = 0;
+  for (; t < maxSeconds && hull > 0 && boss.alive; t += DT20) {
+    // A competent pilot: shoot the shield spire first, then missile racks, turrets, hangar; circle-strafe at ~420 m.
+    let aim = boss.pos;
+    for (const id of ["generator", "seekerL", "seekerR", "turretFL", "turretFR", "turretAL", "turretAR", "hangar"]) {
+      const h = boss.boss!.hardpoints.find((q) => q.id === id && q.alive);
+      if (h) { aim = h.world; break; }
+    }
+    const d = { x: aim.x - p.x, y: aim.y - p.y, z: aim.z - p.z }, L = Math.hypot(d.x, d.y, d.z) || 1;
+    const f = { x: d.x / L, y: d.y / L, z: d.z / L };
+    ang += DT20 * 0.9;
+    const side = { x: -f.z, y: 0, z: f.x }, k = Math.max(-40, Math.min(40, (L - 420) * 0.3));
+    const v = { x: side.x * 55 * Math.sin(ang) + f.x * k, y: 30 * Math.cos(ang * 1.7) + f.y * k, z: side.z * 55 * Math.sin(ang) + f.z * k };
+    p = { x: p.x + v.x * DT20, y: Math.max(60, p.y + v.y * DT20), z: p.z + v.z * DT20 };
+    for (const e of fr(f, v, true)) {
+      if (e.type === "playerHullDamage") hull -= e.amount;
+      if (e.type === "hardpointDestroyed" && e.hardpoint === "generator" && generatorDownAt < 0) generatorDownAt = t;
+    }
+    if (generatorDownAt >= 0) minShieldAfterGen = Math.min(minShieldAfterGen, boss.dur.shield);
+  }
+  return { won: !boss.alive, dead: hull <= 0, t, generatorDownAt, minShieldAfterGen, hardpointsAlive: boss.boss ? boss.boss.hardpoints.filter((h) => h.alive).length : 0 };
+}
+
+test("dreadnought hardpoints are reachable by bolts: the shield spire can be shot off, which drops the shield for good", () => {
+  const r = bossFight(1, { shield: 3, weapons: 3, hull: 2 }, 150);
+  assert.ok(r.generatorDownAt > 0, "generator destroyed by real projectile hits (was unreachable behind the body sphere before M7)");
+  assert.equal(r.minShieldAfterGen, 0, "boss shield stays down after the generator dies");
+  assert.ok(r.hardpointsAlive < 8, "other hardpoints take damage too");
+});
+
+test("dreadnought is beatable by a fully upgraded pilot who breaks the shield spire and evades (and is not a pushover)", () => {
+  const r = bossFight(1, { shield: 3, weapons: 3, hull: 2, engine: 1 }, 700);
+  assert.ok(r.won && !r.dead, `won=${r.won} dead=${r.dead} after ${Math.round(r.t)} game-seconds`);
+  assert.ok(r.t > 150, `a capital ship fight is not over in seconds (${Math.round(r.t)} s)`);
+  assert.ok(r.t < 650, `...nor an endless grind (${Math.round(r.t)} s)`);
+  // An unupgraded stationary pilot loses quickly: the boss gates on progression.
+  const weak = bossFight(2, {}, 120);
+  assert.ok(!weak.won, "no upgrades: not beatable in two minutes");
+});

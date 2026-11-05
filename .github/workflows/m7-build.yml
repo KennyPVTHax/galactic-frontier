@@ -134,3 +134,67 @@ jobs:
         with:
           name: journey-${{ matrix.tier }}
           path: test-results/journey/
+
+  leaks:
+    name: Planet-swap leak test
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Warp through all six planets for 5 laps, forcing GC, and check nothing is retained
+        run: node scripts/leak-test.cjs basic 5
+
+  contracts-e2e:
+    name: Contract E2E (station defense + escort)
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Real browser combat for the station-defense and escort contracts
+        run: |
+          node scripts/contracts-e2e.cjs station basic test-results/contracts-e2e
+          node scripts/contracts-e2e.cjs escort basic test-results/contracts-e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contracts-e2e
+          path: test-results/contracts-e2e/
+
+  contracts-e2e-boss:
+    name: Contract E2E (dreadnought boss)
+    needs: checks-and-web
+    if: ${{ github.event.inputs.full_e2e == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Fight the dreadnought in a real browser (declared hull top-ups; see script header)
+        run: node scripts/contracts-e2e.cjs boss basic test-results/contracts-e2e-boss
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contracts-e2e-boss
+          path: test-results/contracts-e2e-boss/

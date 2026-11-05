@@ -8,6 +8,7 @@ import { ENEMY_TYPES } from "../combat/enemyTypes";
 import type { ResourceId } from "../gameplay/resources";
 import type { GraphicsTier } from "../graphics/profiles";
 import type { PlanetId } from "../universe/types";
+import { deriveStats, sanitizeLevels } from "../gameplay/upgrades";
 
 export function installDebugHooks(g: any): void {
   (window as any).__GF = {
@@ -38,7 +39,11 @@ export function installDebugHooks(g: any): void {
         shotsFired: g.combatStats.shots,
         hitsLanded: g.combatStats.hits,
         kills: g.combatStats.kills,
+      aiLog: g.aiLog.slice(),
         projectiles: g.combat.projectiles().length,
+      allies: g.combat.allies().map((x: any) => ({ id: x.id, kind: x.kind, name: x.name, alive: x.alive, hull: x.dur.hull, shield: x.dur.shield, x: x.pos.x, y: x.pos.y, z: x.pos.z })),
+      boss: (() => { const b = g.combat.boss(); return b ? { alive: b.alive, phase: b.boss?.phase ?? null, hardpointsAlive: b.boss ? b.boss.hardpoints.filter((h: any) => h.alive).length : null, hardpointsTotal: b.boss ? b.boss.hardpoints.length : null, hull: b.dur.hull, shield: b.dur.shield } : null; })(),
+      encounters: g.combat.encounters().map((x: any) => ({ id: x.id, encounter: x.def.id, cleared: x.cleared, alive: x.enemies.size })),
       },
       warping: g.warp ? g.warp.phase : null,
       contract: g.contracts.summary(),
@@ -96,12 +101,53 @@ export function installDebugHooks(g: any): void {
       const tgt = g.combat.target();
       const e = tgt?.enemy ?? g.combat.enemies().find((x: any) => x.alive);
       if (!e) return false;
-      const dx = e.pos.x - g.ship.x, dy = e.pos.y - g.ship.y, dz = e.pos.z - g.ship.z;
+      let aim = e.pos;
+      // Capital ships: shoot the shield spire first, then missile racks, turrets and hangar (the intended play).
+      if (e.boss) for (const id of ["generator", "seekerL", "seekerR", "turretFL", "turretFR", "turretAL", "turretAR", "hangar"]) {
+        const h = e.boss.hardpoints.find((q: any) => q.id === id && q.alive);
+        if (h) { aim = h.world; break; }
+      }
+      const dx = aim.x - g.ship.x, dy = aim.y - g.ship.y, dz = aim.z - g.ship.z;
       g.ship.yaw = Math.atan2(dx, dz);
       g.ship.pitch = Math.atan2(dy, Math.hypot(dx, dz));
       return true;
     },
     spawnEncounter: (id: string) => g.spawnContractEncounter(id),
     startWarp: (id: PlanetId) => g.startWarp(id),
+    /** Test setup: install upgrade levels (e.g. {shield:3,weapons:3,hull:2}) as if bought at the terminal. */
+    setUpgrades: (levels: Record<string, number>) => {
+      g.levels = sanitizeLevels({ ...g.levels, ...levels });
+      g.stats = deriveStats(g.levels);
+      g.ship.maxHull = g.stats.maxHull;
+      g.ship.hull = g.stats.maxHull;
+      g.ship.speedScale = g.stats.speedScale;
+      g.onStatsChanged();
+      g.combat.playerShield = g.combat.playerMaxShield;
+    },
+    /** Test setup: mark contracts done (prerequisites) and optionally start one, as the Frontier log would. */
+    completeContracts: (ids: string[]) => {
+      for (const id of ids) if (!g.contracts.state.completed.includes(id)) g.contracts.state.completed.push(id);
+      if (g.contracts.state.active && ids.includes(g.contracts.state.active.id)) g.contracts.state.active = null;
+      g.refreshMissionHud();
+    },
+    acceptContract: (id: string) => {
+      const ok = g.contracts.accept(id);
+      if (ok) {
+        g.contracts.settle({ planet: g.planetId });
+        g.refreshMissionHud();
+      }
+      return ok;
+    },
+    /** Test failure path: destroy an ally outright (the escort contract must reset). */
+    killAlly: (id: string) => {
+      const a = g.combat.ally(id);
+      // Goes through the combat system's own damage path (so allyHit / allyDestroyed events fire exactly as in play).
+      if (a) g.combat.damageAlly(a, 1e7, { ...a.pos }, g.combat.pending);
+      return !!a;
+    },
+    refillShip: () => {
+      g.ship.hull = g.ship.maxHull;
+      g.combat.playerShield = g.combat.playerMaxShield;
+    },
   };
 }

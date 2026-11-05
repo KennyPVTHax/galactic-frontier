@@ -177,6 +177,8 @@ export class Game {
   private warpFx!: WarpFx;
   private space: SpaceEnvironment | null = null;
   private combatStats = { shots: 0, hits: 0, kills: 0 };
+  /** Recent enemy AI state transitions (bounded), so tests and diagnostics can see the PATROL→…→ATTACK path. */
+  private aiLog: { id: string; from: string; to: string }[] = [];
   private lastHullRatio = 1;
   // ---- real-device performance recorder (M7)
   private readonly perfRec = new PerfRecorder();
@@ -1393,6 +1395,9 @@ export class Game {
     this.tagged.clear();
     this.currentTarget = null;
     this.beam.hide();
+    // Lights first (see Planet.releaseLights): otherwise meshes disposed below keep the old sun alive.
+    this.renderer.releaseWorld();
+    this.planet.releaseLights();
     this.onLeavePlanet();
     this.planet.dispose();
     this.planetDef = getPlanet(id);
@@ -1484,6 +1489,10 @@ export class Game {
     }
   }
 
+  private despawnEncounterById(defId: string): void {
+    for (const inst of [...this.combat.encounters()]) if (inst.def.id === defId) this.combat.despawnEncounter(inst.id);
+  }
+
   private spawnContractEncounter(id: string): void {
     const s = this.ship;
     const around = { x: s.x, y: s.y, z: s.z };
@@ -1540,6 +1549,10 @@ export class Game {
           this.contractEvent({ type: "destroyed", planet: pid, enemy: e.enemyType });
           break;
         }
+        case "aiStateChanged":
+          this.aiLog.push({ id: e.id, from: e.from, to: e.to });
+          if (this.aiLog.length > 64) this.aiLog.shift();
+          break;
         case "hardpointDestroyed":
           this.progress({ type: "xp", amount: e.xp });
           this.hud.toast(`Weapon hardpoint destroyed (+${e.xp} XP)`, "good");
@@ -1557,13 +1570,24 @@ export class Game {
           this.hud.toast("Allied vessel destroyed", "bad");
           {
             const o = this.contracts.objective;
-            this.contractEvent({ type: "allyLost", encounter: o && (o.kind === "escort" || o.kind === "clear") ? o.encounter : "" });
+            const enc = o && (o.kind === "escort" || o.kind === "clear") ? o.encounter : "";
+            this.contractEvent({ type: "allyLost", encounter: enc });
+            // The objective restarts with a fresh ambush: remove what is left of the old one so waves do not stack.
+            if (o && o.kind === "escort") this.despawnEncounterById(o.encounter);
           }
           break;
-        case "encounterCleared":
+        case "encounterCleared": {
+          // An escort is only won with the escortee alive, whatever happened to it (never reward a dead freighter).
+          const o = this.contracts.objective;
+          if (o && o.kind === "escort" && o.encounter === e.encounter && !this.combat.allies().some((a) => a.kind === "freighter" && a.alive)) {
+            this.contractEvent({ type: "allyLost", encounter: o.encounter });
+            this.despawnEncounterById(o.encounter);
+            break;
+          }
           this.hud.toast("Area clear", "good");
           this.contractEvent({ type: "cleared", planet: pid, encounter: e.encounter });
           break;
+        }
       }
     }
     if (this.ship.hull <= 0 && this.ship.state === "flying") this.onShipEvent({ type: "destroyed" });

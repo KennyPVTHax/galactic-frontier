@@ -29,12 +29,14 @@ function check(step, name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  [${step}] ${name}${detail ? "  — " + detail : ""}`);
 }
 const st = (p) => p.evaluate(() => window.__GF.state());
-const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { timeout, polling: 100 });
+// Software rendering is far slower on the heavier tiers (<1 fps on Extreme HD), so every wait scales with the tier.
+const SLOW = { basic: 1, enhanced: 2.5, ultra: 5 }[QUALITY] || 1;
+const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { timeout: timeout * SLOW, polling: 100 });
 
 (async () => {
   const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-  ctx.setDefaultTimeout(120000);
+  ctx.setDefaultTimeout(120000 * SLOW);
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -84,17 +86,12 @@ const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { time
   const enemy = s.combat.enemies[0];
   check(6, "a hostile pirate spacecraft is encountered", s.combat.enemies.length === 1 && enemy.type === "interceptor", `${enemy.name ?? enemy.type} at ${Math.round(Math.hypot(enemy.x - s.ship.x, enemy.y - s.ship.y, enemy.z - s.ship.z))} m`);
 
-  // 7 It detects and attacks (AI state machine, no help from the test).
-  const seen = new Set();
-  const t7 = Date.now();
-  while (Date.now() - t7 < 90000) {
-    const e = (await st(page)).combat.enemies[0];
-    if (!e) break;
-    seen.add(e.state);
-    if (e.state === "attack") break;
-    await page.waitForTimeout(250);
-  }
-  check(7, "enemy AI goes PATROL/DETECT → PURSUE → ATTACK", seen.has("attack") && (seen.has("pursue") || seen.has("detect")), [...seen].join(" → "));
+  // 7 It detects and attacks (AI state machine, no help from the test). Transitions are read from the game's own
+  // bounded AI log, so the check does not depend on polling a transient state at the right moment.
+  await until(page, () => window.__GF.state().combat.aiLog.some((t) => t.to === "attack"), null, 120000).catch(() => undefined);
+  const log = (await st(page)).combat.aiLog;
+  const path = log.map((t) => t.to);
+  check(7, "enemy AI goes PATROL/DETECT → PURSUE → ATTACK", path.indexOf("attack") > 0 && path.slice(0, path.indexOf("attack")).some((x) => x === "detect" || x === "pursue"), path.join(" → "));
 
   // 9a Shields take hits before the hull.
   const before = await st(page);
@@ -110,7 +107,7 @@ const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { time
   let shots = 0;
   const t8 = Date.now();
   let killed = false;
-  while (Date.now() - t8 < 150000) {
+  while (Date.now() - t8 < 150000 * SLOW) {
     // Debug assist: keep the nose on the target (mouse aiming at 2 fps is not practical).
     await page.evaluate(() => window.__GF.aimAtTarget());
     await page.waitForTimeout(200);

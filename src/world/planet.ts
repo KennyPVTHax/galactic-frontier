@@ -2643,13 +2643,31 @@ export class Planet {
    * `lib.release`; shared library materials and SurfaceTextures are untouched).
    * Safe to call twice. Call after Renderer.setWorld has moved to the next planet.
    */
+  /**
+   * Disposes this planet's lights ahead of its meshes. Babylon only strips a disposed light from meshes that are
+   * still in the scene, and disposed meshes can stay reachable from the shader cache, so disposing meshes first
+   * left them (and through them the old sun and its shadow generators) in memory across planet swaps.
+   */
+  releaseLights(): void {
+    for (const l of this.owned.lights) if (!(l as { isDisposed?(): boolean }).isDisposed?.()) (l as { dispose(): void }).dispose();
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.weather?.dispose();
     this.weather = null;
     const o = this.owned;
-    for (const m of o.meshes) if (!m.isDisposed()) m.dispose(false, false);
+    for (const m of o.meshes) {
+      if (m.isDisposed()) continue;
+      // Babylon's compiled-shader cache keeps the mesh that first used a shader alive (Effect closures), and a
+      // disposed mesh still lists the lights it was lit by. Drop those references so what stays retained is a
+      // tiny shell instead of the old sun, its shadow generators and material graph (measured heap leak).
+      const mm = m as unknown as { _lightSources?: unknown[]; _lightSourcesDirty?: boolean };
+      if (mm._lightSources) mm._lightSources.length = 0;
+      m.material = null;
+      m.dispose(false, false);
+    }
     for (const n of o.nodes) if (!n.isDisposed()) n.dispose(false, false);
     const libOwned = new Set<unknown>();
     for (const m of this.gfMats) for (const x of [m.std, m.pbr]) if (x) libOwned.add(x);
@@ -2668,7 +2686,7 @@ export class Planet {
     this.lavaTex?.dispose();
     this.lavaTex = null;
     for (const p of o.particles) (p as { dispose(): void }).dispose();
-    for (const l of o.lights) (l as { dispose(): void }).dispose();
+    for (const l of o.lights) if (!(l as { isDisposed?(): boolean }).isDisposed?.()) (l as { dispose(): void }).dispose();
     this.sky.dispose();
     this.deposits.length = 0;
     this.pois.length = 0;
