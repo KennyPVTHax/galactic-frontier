@@ -90,8 +90,8 @@ const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { time
   // bounded AI log, so the check does not depend on polling a transient state at the right moment.
   await until(page, () => window.__GF.state().combat.aiLog.some((t) => t.to === "attack"), null, 120000).catch(() => undefined);
   const log = (await st(page)).combat.aiLog;
-  const path = log.map((t) => t.to);
-  check(7, "enemy AI goes PATROL/DETECT → PURSUE → ATTACK", path.indexOf("attack") > 0 && path.slice(0, path.indexOf("attack")).some((x) => x === "detect" || x === "pursue"), path.join(" → "));
+  const aiPath = log.map((t) => t.to);
+  check(7, "enemy AI goes PATROL/DETECT → PURSUE → ATTACK", aiPath.indexOf("attack") > 0 && aiPath.slice(0, aiPath.indexOf("attack")).some((x) => x === "detect" || x === "pursue"), aiPath.join(" → "));
 
   // 9a Shields take hits before the hull.
   const before = await st(page);
