@@ -33,6 +33,8 @@ export function installDebugHooks(g: any): void {
       target: g.currentTarget?.id ?? null,
       planet: g.planetId,
       rules: rulesFingerprint(),
+      cinematic: g.cinematic?.stats() ?? null,
+      spaceFade: g.space?.stats().starAlpha ?? 0,
       farm: g.farm,
       combat: {
         enemies: g.combat.enemies().filter((e: any) => e.alive).map((e: any) => ({ id: e.id, type: e.type, name: ENEMY_TYPES[e.type as keyof typeof ENEMY_TYPES].name, state: e.state, x: e.pos.x, y: e.pos.y, z: e.pos.z })),

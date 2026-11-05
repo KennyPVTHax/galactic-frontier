@@ -2,7 +2,7 @@ import { Camera, Engine, Matrix, Scene, Vector3, Color4 } from "../engine/babylo
 import { DEFAULT_THEME, type QualityLevel, type QualitySetting, type Theme } from "./quality";
 import { MaterialLibrary, SurfaceTextures, WorldUniforms, sunVector } from "../graphics/materials";
 import { Renderer } from "../graphics/renderer";
-import { effectiveProfile, legacyFromTier, resolveTier, tierFromLegacy, PROFILES, type GpuCapabilities, type GraphicsTier, type RenderProfile, type TierDecision } from "../graphics/profiles";
+import { effectiveProfile, isFlagship, legacyFromTier, resolveTier, tierFromLegacy, PROFILES, type GpuCapabilities, type GraphicsTier, type RenderProfile, type TierDecision } from "../graphics/profiles";
 import { OrientationController, createHaptics, detectPlatform, probeGpu, type OrientationState, type PlatformInfo } from "../platform/platform";
 import { loadDevicePrefs, saveDevicePrefs, type DevicePrefs } from "../persistence/devicePrefs";
 import { WORLD, stationPadPosition } from "./worldConfig";
@@ -46,10 +46,11 @@ import type { CombatEvent } from "../combat/events";
 import { ENEMY_TYPES } from "../combat/enemyTypes";
 import { WarpFx } from "../graphics/warpFx";
 import { SpaceEnvironment } from "../world/space";
+import { CinematicSpace, cinematicCeiling, type CinematicLevel } from "../presentation/cinematic";
 import { PAINT_SCHEMES } from "../vehicles/shipModel";
 import { upgradeSum } from "./gameHelpers";
 import { rulesFingerprint } from "../shared/rules";
-import { PerfRecorder, type PerfContext, type PerfReport } from "./perfRecorder";
+import { PerfRecorder, isSoftwareRenderer, type PerfContext, type PerfReport } from "./perfRecorder";
 import { FARMING_RULES, RIG_IDS, buildOrUpgrade as farmBuildOrUpgrade, claim as farmClaimAll, freshFarm, getRig, nextLevelCost as farmNextCost, pending as farmPending, rigCapacity, rigRatePerHour, type FarmState, type RigId } from "../gameplay/farming";
 import { PerfOverlay } from "../ui/perfOverlay";
 import { CLIENT_VERSION } from "../integration/backend";
@@ -81,6 +82,8 @@ export interface GameOptions {
   forceTouch?: boolean;
   /** Exposes window.__GF debug helpers (never enable in production). */
   debug?: boolean;
+  /** Cinematic deep-space override for tests/screenshots: "off" or a pinned level "0"–"3" (Full package only; default is performance-governed). */
+  cinematic?: string;
   /** Show the performance recorder (the same overlay is toggled by Settings → Performance stats). */
   perfOverlay?: boolean;
   /** Skip the title screen. */
@@ -178,6 +181,8 @@ export class Game {
   private combatHud!: CombatHud;
   private warpFx!: WarpFx;
   private space: SpaceEnvironment | null = null;
+  /** Full-package cinematic deep space (a no-op stand-in in Lite); its level is chosen from measured frame times. */
+  private cinematic: CinematicSpace | null = null;
   private combatStats = { shots: 0, hits: 0, kills: 0 };
   /** Recent enemy AI state transitions (bounded), so tests and diagnostics can see the PATROL→…→ATTACK path. */
   private aiLog: { id: string; from: string; to: string }[] = [];
@@ -667,6 +672,7 @@ export class Game {
 
     this.updateCombat(dt, uiOpen ? blankInput(input) : input);
     this.space?.update(dt, this.rig.camera.position);
+    this.updateCinematic();
     this.warpFx.update(dt);
     this.keepCameraOutsideStation();
     this.updateShadowFocus();
@@ -1348,6 +1354,7 @@ export class Game {
       planet: this.planetDef.name,
       scene: { meshes: this.scene.meshes.length, activeMeshes: st.activeMeshes, drawCalls: st.drawCalls, trianglesK: Math.round(st.triangles / 1000) },
       activity,
+      cinematic: this.cinematic?.stats(),
     };
   }
 
@@ -1431,6 +1438,8 @@ export class Game {
     this.combat.setPatrols(null);
     this.space?.dispose();
     this.space = null;
+    this.cinematic?.dispose();
+    this.cinematic = null;
   }
 
   private onEnterPlanet(): void {
@@ -1448,10 +1457,43 @@ export class Game {
     try {
       this.space = new SpaceEnvironment(this.scene, opts);
       this.space.setDetail(prof.tier, prof);
+      if (this.cinematicCeiling() > 0 && this.opts.cinematic !== "off") {
+        this.cinematic = new CinematicSpace(this.scene, def.seed ^ 0xc1ae);
+        const forced = Number(this.opts.cinematic);
+        if (this.opts.cinematic !== undefined && Number.isInteger(forced) && forced >= 0 && forced <= 3) this.cinematic.force(forced as CinematicLevel);
+      }
     } catch (e) {
       this.space = null;
       console.warn("space environment unavailable", e);
     }
+  }
+
+  /** Highest cinematic level this tier/device may reach (0 in Lite and on Basic). */
+  private cinematicCeiling(): CinematicLevel {
+    return cinematicCeiling(this.tierDecision.tier, isFlagship(this.caps));
+  }
+
+  private updateCinematic(): void {
+    if (!this.cinematic) return;
+    let thermal: number | null = null;
+    try {
+      const t = this.platform.android?.thermalStatus?.();
+      if (typeof t === "number" && t >= 0) thermal = t;
+    } catch {
+      /* host without thermal API */
+    }
+    const prof = this.currentProfile();
+    const change = this.cinematic.update(this.engine.getDeltaTime() / 1000, this.space?.stats().starAlpha ?? 0, {
+      targetFps: prof.targetFps,
+      ceiling: this.cinematicCeiling(),
+      // Measurements from a software rasteriser say nothing about real GPUs: never promote on them.
+      trusted: !isSoftwareRenderer(this.caps.renderer),
+      reductions: this.renderer.governor.reductions.length,
+      renderScale: this.renderer.governor.scale,
+      maxRenderScale: prof.renderScale,
+      thermal,
+    });
+    if (change) console.info(`[cinematic] level ${change.from} -> ${change.to}: ${change.reason}`);
   }
 
   private onStatsChanged(): void {

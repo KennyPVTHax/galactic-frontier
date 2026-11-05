@@ -17,6 +17,7 @@ const start = params.get("start");
 mountGalacticFrontier(app, {
   quality: q && ["low", "medium", "high", "basic", "enhanced", "ultra"].includes(q) ? (q as QualitySetting) : undefined,
   forceTouch: params.get("touch") === "1",
+  cinematic: params.get("cinematic") ?? undefined,
   perfOverlay: params.get("perf") === "1",
   debug: (typeof __GF_DEBUG__ === "undefined" || __GF_DEBUG__) && params.get("debug") === "1",
   autoStart: start === "new" || start === "continue" ? start : undefined,

@@ -54,6 +54,15 @@ test("Lite excludes Full-only presentation modules", () => {
   assert.ok(![...F.keys()].some((k) => k.endsWith("src/engine/babylon.lite.ts")), "Full never uses the Lite facade");
 });
 
+test("cinematic deep space exists only in Full", () => {
+  assert.ok([...F.keys()].some((k) => k.endsWith("src/presentation/full/cinematicSpace.ts")), "Full ships cinematic space");
+  assert.ok([...F.keys()].some((k) => k.endsWith("src/presentation/full/cinematicController.ts")), "Full ships the performance controller");
+  assert.ok(![...L.keys()].some((k) => /presentation\/full\//.test(k)), "Lite has none of it");
+  assert.ok(![...L.keys()].some((k) => /gfCinematic|uGalaxyN/.test(k)));
+  assert.ok(!lite.html.includes("uGalaxyN"), "no cinematic shader source in the Lite bundle");
+  assert.ok(full.html.includes("uGalaxyN"), "cinematic shader source is in the Full bundle");
+});
+
 test("Lite is materially smaller than Full", () => {
   const l = total(L), f = total(F);
   console.log(`[bundle] lite ${(l / 1024).toFixed(0)} KB vs full ${(f / 1024).toFixed(0)} KB of input bytes in output (${((1 - l / f) * 100).toFixed(1)}% smaller)`);

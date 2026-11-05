@@ -51,6 +51,8 @@ export interface PerfContext {
   scene: { meshes: number; activeMeshes: number; drawCalls: number | null; trianglesK: number | null };
   /** What the player was doing, so reports can be compared like with like. */
   activity: string;
+  /** Cinematic deep-space controller state (Full package): current level, level-0 baseline, recent promotions/rollbacks. */
+  cinematic?: unknown;
 }
 
 export interface PerfReport {
