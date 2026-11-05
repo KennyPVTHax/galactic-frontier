@@ -15,7 +15,7 @@
 // against a Babylon source checkout, set BABYLON_CORE_SRC=/path/to/Babylon.js/packages/dev/core/src
 // (shader .fx files must be pre-generated to .ts in that checkout).
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,6 +59,12 @@ const packagePlugin = {
   name: "gf-package",
   setup(b) {
     b.onLoad({ filter: /[\\/]@babylonjs[\\/]core[\\/]ShadersWGSL[\\/].*\.js$/ }, () => ({ contents: "export {};", loader: "js" }));
+    // The glTF loader statically references Babylon's OpenPBR material (~230 KB with shaders). This game uses the standard
+    // metallic-roughness PBRMaterial for glTF, never OpenPBR, so it is replaced by an inert stub.
+    b.onLoad({ filter: /[\\/]@babylonjs[\\/]core[\\/]Materials[\\/]PBR[\\/]openpbrMaterial\.pure\.js$/ }, () => ({
+      contents: "export class OpenPBRMaterial { constructor() { throw new Error('OpenPBRMaterial is not included in this build'); } }\nexport function RegisterOpenpbrMaterial() {}\nexport const OpenPBRMaterialDefines = class {};",
+      loader: "js",
+    }));
     if (pkgName === "lite") {
       const lite = join(root, "src/engine/babylon.lite.ts");
       b.onResolve({ filter: /(^|\/)engine\/babylon$/ }, (a) => (a.importer === lite ? undefined : { path: lite }));
@@ -106,7 +112,18 @@ async function buildPreviewBundle(minify = true) {
 }
 
 // Release pages get a strict CSP: only the inline bundle runs, nothing can be fetched from the network.
-const RELEASE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src data: blob:; worker-src blob:; base-uri 'none'; form-action 'none'";
+// FULL packages may fetch their own bundled hero models (same origin only: the APK's appassets origin / the web build's own host);
+// LITE ships no models and keeps the original no-fetch policy.
+const RELEASE_CSP = `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src ${pkgName === "full" ? "'self' " : ""}data: blob:; worker-src blob:; base-uri 'none'; form-action 'none'`;
+
+/** Copies authored glTF/GLB hero assets (assets/models: manifest.json, *.glb, CREDITS.md) next to a FULL build's index.html. Never for Lite. */
+function copyModels(outDir) {
+  if (pkgName !== "full") return;
+  const src = join(root, "assets/models");
+  if (!existsSync(join(src, "manifest.json"))) return;
+  cpSync(src, join(outDir, "models"), { recursive: true });
+  console.log(`[build] models -> ${join(outDir, "models")}`);
+}
 
 function htmlShell(inlineJs, release = false) {
   let tpl = readFileSync(join(root, "index.html"), "utf8");
@@ -121,6 +138,7 @@ async function buildPreview() {
   const out = join(root, "dist/preview/index.html");
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, htmlShell(js));
+  copyModels(dirname(out));
   writeFileSync(join(root, "dist/preview/meta.json"), JSON.stringify(meta));
   // Body-only variant for hosts that supply their own document skeleton (e.g. claude.ai artifacts).
   const safe = js.replace(/<\/script/gi, "<\\/script");
@@ -164,6 +182,7 @@ async function buildRelease(outFile) {
   const { js, meta } = await buildPreviewBundle(true);
   mkdirSync(dirname(outFile), { recursive: true });
   writeFileSync(outFile, htmlShell(js, true));
+  copyModels(dirname(outFile));
   // Bundle composition (inputs → bytes). Kept outside the shipped HTML; tests/package-boundary.test.ts reads it.
   if (mode !== "android") writeFileSync(join(dirname(outFile), "meta.json"), JSON.stringify(meta));
   console.log(`[build] ${mode} -> ${outFile} (${(Buffer.byteLength(js) / 1024).toFixed(0)} KB JS inlined, debug hooks: off)`);

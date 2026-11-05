@@ -1,5 +1,7 @@
 # Checkpoint A — Android Full: detailed astronaut
 
+> **REJECTED by the owner (still cartoonish).** The procedural astronaut is kept only as a temporary fallback and must not be presented as the realistic model. The replacement approach is an authored GLB/PBR asset pipeline: see `docs/VISUAL-STANDARD.md`, `docs/ASSET-RESEARCH.md`, `docs/ASSET-PIPELINE.md`. The "Honest quality statement" and "Decisions needed" sections below are superseded.
+
 Part of the "Android cinematic realism first" priority. Android Full only; the Telegram Lite build keeps its original astronaut
 (no further Lite visual work until the Android experience is approved). Shared rules, farming, sync and parity tests are untouched.
 

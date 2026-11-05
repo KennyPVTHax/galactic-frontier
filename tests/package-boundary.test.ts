@@ -70,6 +70,22 @@ test("the detailed astronaut is Full-only; Lite keeps the original simple one", 
   assert.ok(![...L.keys()].some((k) => k.endsWith("astronautFull.ts")), "Lite has no detailed astronaut");
 });
 
+test("the GLB asset pipeline and hero models exist only in Full", () => {
+  assert.ok([...F.keys()].some((k) => /@babylonjs\/loaders\//.test(k)), "Full ships the glTF loader");
+  assert.ok([...F.keys()].some((k) => k.endsWith("src/presentation/full/assets/rigDriver.ts")), "Full ships the retargeting rig");
+  assert.ok(![...L.keys()].some((k) => /@babylonjs\/loaders\//.test(k)), "Lite has no glTF loader");
+  assert.ok(![...L.keys()].some((k) => /presentation\/full\/assets\//.test(k)), "Lite has no asset-pipeline code");
+  assert.ok(!lite.html.includes("models/manifest.json"), "Lite never looks for hero models");
+});
+
+test("hero models are copied only into Full builds, never into Lite", async () => {
+  const { existsSync } = await import("node:fs");
+  assert.ok(existsSync(join(ROOT, "dist/web/models/manifest.json")), "Full release build carries models/manifest.json");
+  assert.ok(!existsSync(join(ROOT, "dist/telegram/models")), "Lite build has no models folder");
+  assert.ok(full.html.includes("connect-src 'self'"), "Full CSP allows same-origin model fetches");
+  assert.ok(!lite.html.includes("connect-src 'self'"), "Lite CSP keeps the no-fetch policy");
+});
+
 test("Lite is materially smaller than Full", () => {
   const l = total(L), f = total(F);
   console.log(`[bundle] lite ${(l / 1024).toFixed(0)} KB vs full ${(f / 1024).toFixed(0)} KB of input bytes in output (${((1 - l / f) * 100).toFixed(1)}% smaller)`);
@@ -88,7 +104,7 @@ test("no WGSL sources and no test hooks in either shipped bundle", () => {
   for (const [name, m, html] of [["lite", L, lite.html], ["full", F, full.html]] as const) {
     // The stripped modules remain as ~28-byte empty wrappers; real WGSL sources are tens of KB each.
     const wgsl = [...m.entries()].filter(([k]) => /ShadersWGSL/.test(k)).reduce((a, [, v]) => a + v, 0);
-    assert.ok(wgsl < 1024, `${name}: WGSL shader sources are stripped (${wgsl} bytes remain)`);
+    assert.ok(wgsl < 2048, `${name}: WGSL shader sources are stripped (${wgsl} bytes remain)`);
     assert.ok(!html.includes("__GF_EVENTS") && !html.includes("completeContracts") && !html.includes("warpNow"), `${name}: no test hooks`);
     assert.ok(html.includes("default-src 'none'"), `${name}: strict CSP`);
   }

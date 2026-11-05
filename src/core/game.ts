@@ -266,6 +266,7 @@ export class Game {
     this.combatRenderer.setBudget(prof.combatFx);
     this.combatRenderer.setPbr(prof.pbr);
     this.space?.setDetail(prof.tier, prof);
+    this.player.model.setTier(prof.tier);
     this.planet.weather?.setBudget(prof.weatherParticles);
     this.combatHud.setTouch(this.input.touchActive);
   }

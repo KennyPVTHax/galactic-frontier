@@ -10,6 +10,8 @@ import { mountGalacticFrontier, LocalStorageSaveAdapter, OfflineBackend, type Qu
 
 declare const __GF_DEBUG__: boolean | undefined;
 const params = new URLSearchParams(location.search);
+// Debug/test only: serve hero models from another base URL (compiled out of release bundles with the rest of the debug surface).
+if ((typeof __GF_DEBUG__ === "undefined" || __GF_DEBUG__) && params.get("models")) (window as unknown as { gfModelsBase?: string }).gfModelsBase = params.get("models") as string;
 const app = document.getElementById("app")!;
 const q = params.get("quality");
 const start = params.get("start");

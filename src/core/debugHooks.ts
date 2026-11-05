@@ -55,6 +55,7 @@ export function installDebugHooks(g: any): void {
       planet: g.planetId,
       rules: rulesFingerprint(),
       cinematic: g.cinematic?.stats() ?? null,
+      astronaut: g.player.model.status ?? null,
       spaceFade: g.space?.stats().starAlpha ?? 0,
       farm: g.farm,
       combat: {

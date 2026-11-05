@@ -36,10 +36,13 @@
     "test:contracts": "node scripts/contracts-e2e.cjs",
     "build:telegram": "node scripts/build.mjs telegram",
     "build:telegram-test": "node scripts/build.mjs telegram-test",
+    "test:hero": "node scripts/build.mjs preview && node scripts/hero-asset-test.cjs",
+    "make:test-glb": "node scripts/make-test-glb.cjs",
     "test:parity": "node scripts/build.mjs preview && node scripts/build.mjs telegram-test && node scripts/parity-test.cjs"
   },
   "dependencies": {
-    "@babylonjs/core": "^9.33.2"
+    "@babylonjs/core": "^9.33.2",
+    "@babylonjs/loaders": "9.33.2"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

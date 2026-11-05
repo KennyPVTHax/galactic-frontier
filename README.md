@@ -164,3 +164,6 @@ The smoke test uses debug teleports to skip long flights, and tops up samples af
 
 ## M8 — one universe, two visual experiences
 See [docs/M8-REPORT.md](docs/M8-REPORT.md): shared gameplay core, Telegram *Lite* package (`npm run build:telegram`), Android/desktop *Full* package with performance-governed cinematic space, cross-platform progression protocol, parity tests (`npm run test:parity`).
+
+## Android Full hero assets
+Authored GLB/PBR pipeline (loader, skeleton retargeting, fallbacks, APK packaging): [docs/ASSET-PIPELINE.md](docs/ASSET-PIPELINE.md). Candidate models and licences: [docs/ASSET-RESEARCH.md](docs/ASSET-RESEARCH.md). Visual acceptance standard: [docs/VISUAL-STANDARD.md](docs/VISUAL-STANDARD.md).

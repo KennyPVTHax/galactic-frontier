@@ -147,6 +147,9 @@ export class Astronaut {
     this.muzzle = node("astro-muzzle", hand, 0, -0.34, 0.5);
   }
 
+  /** The Full package's hero astronaut switches asset by graphics tier; the simple model has nothing to switch. */
+  setTier(_tier: string): void {}
+
   setVisible(v: boolean): void {
     this.root.setEnabled(v);
   }

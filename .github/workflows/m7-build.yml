@@ -86,6 +86,8 @@ jobs:
           unzip -p "$APK" assets/www/index.html > /tmp/game.html
           test -s /tmp/game.html
           if grep -q "window.__GF" /tmp/game.html; then echo "test hooks found in bundled game"; exit 1; fi
+          unzip -l "$APK" | grep -q "assets/www/models/manifest.json" || { echo "hero-model manifest missing from the APK"; exit 1; }
+          echo "APK hero models:"; unzip -l "$APK" | grep "assets/www/models/" || true
           mkdir -p out
           cp "$APK" out/galactic-frontier-m7-debug.apk
           (cd out && sha256sum galactic-frontier-m7-debug.apk | tee galactic-frontier-m7-debug.apk.sha256)
@@ -137,11 +139,15 @@ jobs:
         run: GF_BUILD=telegram-test node scripts/journey-test.cjs test-results/journey-lite basic
       - name: Parity - same rules fingerprint, costs, farming and stats in Lite and Full
         run: node scripts/parity-test.cjs
+      - name: Hero-asset pipeline in the real game (GLB adoption, retargeting, 3 fallbacks, Basic tier)
+        run: node scripts/hero-asset-test.cjs test-results/hero-assets
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: lite-journey-and-parity
-          path: test-results/journey-lite/
+          path: |
+            test-results/journey-lite/
+            test-results/hero-assets/
 
   # Heavier tiers: software rendering makes these slow, so they run on request (workflow_dispatch full_e2e).
   journey-heavy:
