@@ -21,6 +21,8 @@ const CORS = { "access-control-allow-origin": "*" };
 
 async function open(browser, tier, routes) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  // CI runners render this scene at ~1 fps and are sometimes heavily loaded: a screenshot can take well over Playwright's 30 s default.
+  page.setDefaultTimeout(240000);
   const errs = [];
   page.on("pageerror", (e) => errs.push(e.message));
   await page.route(BASE + "**", (r) => routes(r, r.request().url().slice(BASE.length)));
@@ -39,7 +41,8 @@ async function open(browser, tier, routes) {
   return { page, errs };
 }
 const astro = (p) => p.evaluate(() => window.__GF.state().astronaut);
-const settle = async (p, mode) => { try { await p.waitForFunction((m) => { const a = window.__GF.state().astronaut; return a && a.mode === m; }, mode, { timeout: 60000 }); } catch {} };
+const settle = async (p, mode, timeout = 120000) => { try { await p.waitForFunction((m) => { const a = window.__GF.state().astronaut; return a && a.mode === m; }, mode, { timeout }); } catch {} };
+const snap = (p, name) => p.screenshot({ path: path.join(OUT, name), type: "jpeg", quality: 88, timeout: 240000 });
 
 (async () => {
   const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
@@ -67,11 +70,11 @@ const settle = async (p, mode) => { try { await p.waitForFunction((m) => { const
       return { height: bb.maximumWorld.y - bb.minimumWorld.y, feetY: bb.minimumWorld.y - g.player.position.y, authored: m.usingAuthoredModel };
     });
     check("2. normalised to 1.8 m with feet on the ground", Math.abs(geo.height - 1.8) < 0.15 && Math.abs(geo.feetY) < 0.1, JSON.stringify(geo));
-    await page.screenshot({ path: path.join(OUT, "pipeline-fixture-idle.jpg"), type: "jpeg", quality: 88 });
+    await snap(page, "pipeline-fixture-idle.jpg");
     const m0 = await page.evaluate(() => { const p = window.__GF.game.player.model.muzzle.getAbsolutePosition(); return [p.x, p.y, p.z]; });
     await page.keyboard.down("KeyW"); await page.keyboard.down("ShiftLeft");
     await page.waitForTimeout(3500);
-    await page.screenshot({ path: path.join(OUT, "pipeline-fixture-run.jpg"), type: "jpeg", quality: 88 });
+    await snap(page, "pipeline-fixture-run.jpg");
     const m1 = await page.evaluate(() => { const p = window.__GF.game.player.model.muzzle.getAbsolutePosition(); return [p.x, p.y, p.z]; });
     await page.keyboard.up("ShiftLeft"); await page.keyboard.up("KeyW");
     const near = await page.evaluate(() => { const g = window.__GF.game; const m = g.player.model.muzzle.getAbsolutePosition(); const p = g.player.position; return Math.hypot(m.x - p.x, m.y - p.y, m.z - p.z); });
@@ -89,7 +92,7 @@ const settle = async (p, mode) => { try { await p.waitForFunction((m) => { const
       if (!file.startsWith(dir) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return r.fulfill({ status: 404, headers: CORS, body: "" });
       r.fulfill({ status: 200, headers: { ...CORS, "content-type": file.endsWith(".glb") ? "model/gltf-binary" : "application/json" }, body: fs.readFileSync(file) });
     });
-    await settle(page, "glb");
+    await settle(page, "glb", 420000);
     const a = await astro(page);
     check("2b. real tnnv model adopted: 4 meshes, 26,006 triangles", a.mode === "glb" && a.meshes === 4 && a.triangles === 26006, JSON.stringify({ mode: a.mode, meshes: a.meshes, tris: a.triangles, loadMs: a.loadMs }));
     check("2b. skeleton understood incl. right-arm IK twins", a.rig && a.rig.bones >= 21 && a.rig.ikTwins.includes("upperarm_ik_r_033") && a.rig.ikTwins.includes("lowerarm_ik_r_034"), JSON.stringify(a.rig));
