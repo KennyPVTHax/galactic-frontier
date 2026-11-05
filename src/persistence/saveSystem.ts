@@ -1,13 +1,15 @@
 import { Inventory, type InventoryCounts } from "../gameplay/inventory";
 import { IntroMission, type MissionSnapshot } from "../gameplay/mission";
 import { sanitizeLevels, type UpgradeLevels } from "../gameplay/upgrades";
-import type { QualitySetting } from "../core/quality";
+/** Legacy M1 field kept so old saves load. Graphics are chosen per device (devicePrefs), never stored in the shared save. */
+export type QualitySetting = "auto" | "low" | "medium" | "high";
 import type { BackendClient } from "../integration/backend";
 import { Progression, freshProgression, type ProgressionState } from "../gameplay/progression";
 import { ContractBoard, type ContractState } from "../gameplay/contracts";
 import { PLANET_IDS, type PlanetId } from "../universe/types";
+import { freshFarm, sanitizeFarm, type FarmState } from "../gameplay/farming";
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 /** Where the Wayfarer is in the system (M4). */
 export interface UniverseSave {
@@ -45,6 +47,8 @@ export interface SaveData {
   universe: UniverseSave;
   progression: ProgressionState;
   contracts: ContractState;
+  /** v4 (M8): Orbital Harvesters. */
+  farm: FarmState;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = { quality: "auto", lookSensitivity: 1, invertY: false, showFps: false };
@@ -67,6 +71,7 @@ export function newGameSave(now = Date.now()): SaveData {
     universe: { planet: "veyra7", arrivals: [] },
     progression: freshProgression(),
     contracts: ContractBoard.fresh(now),
+    farm: freshFarm(now),
   };
 }
 
@@ -96,6 +101,11 @@ export function migrateSave(raw: unknown): SaveData | null {
     r.progression = null;
     r.contracts = null;
     version = 3;
+  }
+  // v3 -> v4: Orbital Harvesters. Existing progress is untouched; the player starts with no rigs built.
+  if (version === 3) {
+    r.farm = null;
+    version = 4;
   }
 
   const base = newGameSave(finite(r.savedAt, Date.now()));
@@ -145,6 +155,7 @@ export function migrateSave(raw: unknown): SaveData | null {
     universe: { planet, arrivals },
     progression: Progression.sanitize(r.progression),
     contracts: r.contracts ? ContractBoard.sanitize(r.contracts) : ContractBoard.fresh(),
+    farm: sanitizeFarm(r.farm, finite(r.savedAt, Date.now())),
   };
 }
 

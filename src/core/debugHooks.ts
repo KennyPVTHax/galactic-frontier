@@ -9,6 +9,7 @@ import type { ResourceId } from "../gameplay/resources";
 import type { GraphicsTier } from "../graphics/profiles";
 import type { PlanetId } from "../universe/types";
 import { deriveStats, sanitizeLevels } from "../gameplay/upgrades";
+import { rulesFingerprint } from "../shared/rules";
 
 export function installDebugHooks(g: any): void {
   (window as any).__GF = {
@@ -31,6 +32,8 @@ export function installDebugHooks(g: any): void {
       tagged: g.tagged.size,
       target: g.currentTarget?.id ?? null,
       planet: g.planetId,
+      rules: rulesFingerprint(),
+      farm: g.farm,
       combat: {
         enemies: g.combat.enemies().filter((e: any) => e.alive).map((e: any) => ({ id: e.id, type: e.type, name: ENEMY_TYPES[e.type as keyof typeof ENEMY_TYPES].name, state: e.state, x: e.pos.x, y: e.pos.y, z: e.pos.z })),
         /** Combat simulation clock (game seconds). Test budgets use this, not wall-clock time: the sim advances at most 0.1 s per frame. */

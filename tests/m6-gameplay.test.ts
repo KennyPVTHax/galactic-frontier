@@ -149,7 +149,7 @@ test("suit integrity drains in hazards, warns, fails once and recovers when shel
 });
 
 test("save v3: new game, round trip, and v1/v2 saves migrate without losing progress", async () => {
-  assert.equal(SAVE_VERSION, 3);
+  assert.equal(SAVE_VERSION, 4);
   const fresh = newGameSave();
   assert.equal(fresh.universe.planet, "veyra7");
   assert.equal(fresh.contracts.active?.id, "aetherion_signal");
@@ -161,7 +161,7 @@ test("save v3: new game, round trip, and v1/v2 saves migrate without losing prog
   (v2.inventory as Record<string, number>).ferrite = 77;
   (v2.mission as { step: string }).step = "mine";
   const m = migrateSave(v2)!;
-  assert.equal(m.version, 3);
+  assert.equal(m.version, 4);
   assert.equal(m.inventory.ferrite, 77);
   assert.equal(m.mission.step, "mine");
   assert.equal(m.universe.planet, "veyra7");

@@ -1,0 +1,24 @@
+{
+  "fingerprint": "172957fe01c91f",
+  "saveVersion": 4,
+  "sections": {
+    "world": "1f8ef784937425",
+    "resources": "1ac5af5be03ad0",
+    "upgrades": "0b4e1ee50d6cf6",
+    "upgradeEffects": "0e72f996295be3",
+    "miningLaser": "1f9d8f4b5a3054",
+    "introMission": "0133bce43afe9f",
+    "contracts": "17220fec05dd43",
+    "ranks": "1f51d33bf930e4",
+    "achievements": "1e19693ce729f6",
+    "hazards": "09792dd09c4ff5",
+    "enemies": "144a2a79c2cde5",
+    "factions": "14d0db267c1727",
+    "encounters": "10cc8837ee1324",
+    "weapons": "1d492fafeb80f0",
+    "difficulty": "0072d837c02fa8",
+    "playerCombat": "1b1e603d4d957d",
+    "farming": "12c18a50b04826",
+    "planets": "1b56618896c9a5"
+  }
+}

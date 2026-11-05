@@ -17,10 +17,10 @@ import { InputManager, type InputFrame } from "../input/input";
 import { Hud, type PanelId, type ScreenMarker, type CompassMarker } from "../ui/hud";
 import { Inventory } from "../gameplay/inventory";
 import { MiningLaserState } from "../gameplay/miningLaser";
-import { RESOURCES, type ResourceId } from "../gameplay/resources";
+import { RESOURCES, formatCost, type ResourceId } from "../gameplay/resources";
 import { deriveStats, emptyLevels, purchaseUpgrade, getUpgrade, type DerivedStats, type UpgradeId, type UpgradeLevels } from "../gameplay/upgrades";
 import { IntroMission, MISSION_REQUIREMENTS, MISSION_STEPS, INTRO_MISSION_ID, type GameplayEvent } from "../gameplay/mission";
-import { LaserBeam, ScanPulse, EnvironmentFx, ShipFx, makeParticleTexture } from "../gameplay/effects";
+import { LaserBeam, ScanPulse, EnvironmentFx, ShipFx, makeParticleTexture } from "../graphics/gameplayFx";
 import {
   DEFAULT_SETTINGS,
   LocalStorageSaveAdapter,
@@ -48,7 +48,9 @@ import { WarpFx } from "../graphics/warpFx";
 import { SpaceEnvironment } from "../world/space";
 import { PAINT_SCHEMES } from "../vehicles/shipModel";
 import { upgradeSum } from "./gameHelpers";
+import { rulesFingerprint } from "../shared/rules";
 import { PerfRecorder, type PerfContext, type PerfReport } from "./perfRecorder";
+import { FARMING_RULES, RIG_IDS, buildOrUpgrade as farmBuildOrUpgrade, claim as farmClaimAll, freshFarm, getRig, nextLevelCost as farmNextCost, pending as farmPending, rigCapacity, rigRatePerHour, type FarmState, type RigId } from "../gameplay/farming";
 import { PerfOverlay } from "../ui/perfOverlay";
 import { CLIENT_VERSION } from "../integration/backend";
 import { installDebugHooks } from "./debugHooks";
@@ -57,7 +59,7 @@ import { installDebugHooks } from "./debugHooks";
 declare const __GF_DEBUG__: boolean | undefined;
 
 export type GameOutEvent =
-  | { type: "ready"; quality: QualityLevel; tier: GraphicsTier }
+  | { type: "ready"; quality: QualityLevel; tier: GraphicsTier; /** Fingerprint of the shared gameplay rules this build runs (identical on every platform). */ rules: string }
   | { type: "missionStep"; step: string }
   | { type: "missionComplete"; result: MissionSubmissionResult }
   | { type: "saved"; at: number }
@@ -187,7 +189,9 @@ export class Game {
   private perfSampleMs = 0;
   private perfLiveMs = 0;
   private particleTex: ReturnType<typeof makeParticleTexture> | null = null;
-  private frontierTab: "contracts" | "pilot" = "contracts";
+  private frontierTab: "contracts" | "pilot" | "farm" = "contracts";
+  /** Orbital Harvesters (shared farming rules, gameplay/farming.ts). */
+  farm: FarmState = freshFarm(Date.now());
 
   get planetId(): PlanetId {
     return this.planetDef.id;
@@ -390,7 +394,7 @@ export class Game {
     this.hud.setLoading("Ready", 1);
     this.hud.hideLoading();
     this.hud.root.classList.add("title");
-    this.emit({ type: "ready", quality: this.qualityLevel, tier: this.tierDecision.tier });
+    this.emit({ type: "ready", quality: this.qualityLevel, tier: this.tierDecision.tier, rules: rulesFingerprint() });
     this.orientation.refresh();
     // The define is used inline (not via a const) so the bundler folds the branch away in release builds.
     if ((typeof __GF_DEBUG__ === "undefined" || __GF_DEBUG__) && this.opts.debug) installDebugHooks(this);
@@ -488,6 +492,7 @@ export class Game {
     this.applyDepositState();
     this.progression = new Progression(s.progression);
     this.contracts = new ContractBoard(s.contracts);
+    this.farm = JSON.parse(JSON.stringify(s.farm));
     this.arrivals = new Set(s.universe.arrivals);
     this.ship.speedScale = this.stats.speedScale;
     this.suit.reset();
@@ -531,6 +536,7 @@ export class Game {
       universe: { planet: this.planetId, arrivals: [...this.arrivals] },
       progression: JSON.parse(JSON.stringify(this.progression.state)),
       contracts: JSON.parse(JSON.stringify(this.contracts.state)),
+      farm: JSON.parse(JSON.stringify(this.farm)),
     };
   }
 
@@ -1850,6 +1856,7 @@ export class Game {
         available: this.contracts.available(),
         completed: this.contracts.state.completed.length,
         progression: this.progression.state,
+        farm: this.farmView(),
       }),
       true,
     );
@@ -1873,6 +1880,23 @@ export class Game {
         void this.save();
         this.openFrontier();
       },
+      farmBuild: (id) => {
+        const r = farmBuildOrUpgrade(this.farm, id, this.inventory, Date.now());
+        if (r.ok) {
+          this.farm = r.farm;
+          this.hud.toast(`${getRig(id).name} ${this.farm[id].level === 1 ? "built" : `upgraded to level ${this.farm[id].level}`}`, "good");
+          void this.save();
+        } else this.hud.toast(r.reason === "funds" ? "Not enough resources" : "Already at maximum", "warn");
+        this.openFrontier();
+      },
+      farmClaim: () => {
+        const r = farmClaimAll(this.farm, this.inventory, Date.now());
+        this.farm = r.farm;
+        const parts = (Object.entries(r.gained) as [ResourceId, number][]).filter(([, n]) => n > 0).map(([id, n]) => `+${n} ${RESOURCES[id].name}`);
+        this.hud.toast(parts.length ? `Harvest delivered: ${parts.join(" · ")}${r.blocked ? ` (${r.blocked} left — cargo full)` : ""}` : r.blocked ? "Cargo hold full — upgrade Cargo Lattice" : "Nothing to claim yet", parts.length ? "good" : "info");
+        void this.save();
+        this.openFrontier();
+      },
       paint: (id) => {
         if (this.progression.setPaint(id)) {
           this.onStatsChanged();
@@ -1880,6 +1904,28 @@ export class Game {
         }
         this.openFrontier();
       },
+    });
+  }
+
+  private farmView() {
+    const now = Date.now();
+    const pend = farmPending(this.farm, now);
+    return RIG_IDS.map((id) => {
+      const def = getRig(id);
+      const lvl = this.farm[id].level;
+      const cost = farmNextCost(this.farm, id);
+      return {
+        id,
+        name: def.name,
+        resource: def.resource,
+        level: lvl,
+        maxLevel: FARMING_RULES.maxLevel,
+        pending: pend[id],
+        capacity: rigCapacity(id, lvl),
+        ratePerHour: rigRatePerHour(id, lvl),
+        nextCost: cost ? formatCost(cost) : null,
+        affordable: !!cost && this.inventory.has(cost),
+      };
     });
   }
 

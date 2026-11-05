@@ -8,6 +8,7 @@ import type { ContractDef } from "../gameplay/contracts";
 import { objectiveText } from "../gameplay/contracts";
 import { ACHIEVEMENTS, PAINTS, RANKS, rankOf, unlockedPaints, type ProgressionState } from "../gameplay/progression";
 import { ENEMY_TYPE_IDS } from "../combat/ids";
+import type { RigId } from "../gameplay/farming";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
@@ -84,8 +85,22 @@ export function bindStarMap(el: HTMLElement, onSelect: (id: PlanetId) => void, o
   el.querySelectorAll<HTMLButtonElement>("[data-warp]").forEach((b) => b.addEventListener("click", () => onWarp(b.dataset.warp as PlanetId)));
 }
 
+export interface FarmRigView {
+  id: RigId;
+  name: string;
+  resource: ResourceId;
+  level: number;
+  maxLevel: number;
+  pending: number;
+  capacity: number;
+  ratePerHour: number;
+  nextCost: string | null;
+  affordable: boolean;
+}
+
 export interface FrontierView {
-  tab: "contracts" | "pilot";
+  tab: "contracts" | "pilot" | "farm";
+  farm?: FarmRigView[];
   active: { def: ContractDef; step: number; progress: number } | null;
   available: ContractDef[];
   completed: number;
@@ -107,13 +122,29 @@ function contractCard(c: ContractDef, active: { step: number; progress: number }
 }
 
 export function frontierHtml(v: FrontierView): string {
-  const tabs = `<div class="gf-tabs"><button class="gf-tab ${v.tab === "contracts" ? "on" : ""}" data-ftab="contracts">Contracts</button><button class="gf-tab ${v.tab === "pilot" ? "on" : ""}" data-ftab="pilot">Pilot log</button></div>`;
+  const tabs = `<div class="gf-tabs"><button class="gf-tab ${v.tab === "contracts" ? "on" : ""}" data-ftab="contracts">Contracts</button><button class="gf-tab ${v.tab === "farm" ? "on" : ""}" data-ftab="farm">Harvesters</button><button class="gf-tab ${v.tab === "pilot" ? "on" : ""}" data-ftab="pilot">Pilot log</button></div>`;
   let body = "";
   if (v.tab === "contracts") {
     const act = v.active ? contractCard(v.active.def, v.active) : `<p class="gf-note">No active contract. Accept one below.</p>`;
     const avail = v.available.length ? v.available.map((c) => contractCard(c, null)).join("") : `<p class="gf-note">No other contracts right now. Complete your active work to unlock more.</p>`;
     body = `<div class="gf-label">Active</div>${act}<div class="gf-label" style="margin-top:14px">Available</div>${v.active ? `<p class="gf-note">Accepting a new contract replaces the active one.</p>` : ""}${avail}
       <p class="gf-note">${v.completed} contract${v.completed === 1 ? "" : "s"} completed. Rewards are gameplay resources and XP only — not Orbit Coins.</p>`;
+  } else if (v.tab === "farm") {
+    const rigs = v.farm ?? [];
+    const total = rigs.reduce((a, r) => a + r.pending, 0);
+    const cards = rigs
+      .map((r) => {
+        const res = RESOURCES[r.resource];
+        const fill = r.capacity > 0 ? Math.min(100, Math.round((100 * r.pending) / r.capacity)) : 0;
+        const action = r.level >= r.maxLevel ? `<button class="gf-btn" disabled>Max</button>` : `<button class="gf-btn" data-farm-build="${r.id}" ${r.affordable ? "" : "disabled"}>${r.level === 0 ? "Build" : "Upgrade"}</button>`;
+        return `<div class="gf-rig"><div class="t"><span class="gf-gem" style="color:${res.color}"></span><b>${esc(r.name)}</b> <small>${r.level === 0 ? "not built" : `level ${r.level}/${r.maxLevel}`}</small></div>
+          <div class="gf-bar"><div class="track"><div class="fill" style="width:${fill}%;background:${res.color}"></div></div></div>
+          <div class="s">${r.level === 0 ? `Produces ${esc(res.name)} while you play or are away.` : `${r.pending} / ${Math.floor(r.capacity)} ${esc(res.name)} stored · ${r.ratePerHour.toFixed(1)}/h`}</div>
+          <div class="c ${r.nextCost && !r.affordable ? "no" : ""}">${r.nextCost ? `${r.level === 0 ? "Build" : "Upgrade"}: ${esc(r.nextCost)}` : "Fully upgraded"}</div>${action}</div>`;
+      })
+      .join("");
+    body = `<p class="gf-note" style="margin-top:0">Orbital Harvesters work while you are away and hold up to six hours of output. Claim delivers to your cargo hold (limited by capacity). These are in-game resources only.</p>${cards}
+      <div style="margin-top:12px"><button class="gf-btn cy" data-farm-claim ${total > 0 ? "" : "disabled"}>Claim all${total > 0 ? ` (${total})` : ""}</button></div>`;
   } else {
     const p = v.progression;
     const r = rankOf(p.xp);
@@ -136,9 +167,11 @@ export function frontierHtml(v: FrontierView): string {
 
 export function bindFrontier(
   el: HTMLElement,
-  cb: { tab(t: "contracts" | "pilot"): void; accept(id: string): void; abandon(): void; paint(id: string): void },
+  cb: { tab(t: "contracts" | "pilot" | "farm"): void; accept(id: string): void; abandon(): void; paint(id: string): void; farmBuild?(id: RigId): void; farmClaim?(): void },
 ): void {
-  el.querySelectorAll<HTMLButtonElement>("[data-ftab]").forEach((b) => b.addEventListener("click", () => cb.tab(b.dataset.ftab as "contracts" | "pilot")));
+  el.querySelectorAll<HTMLButtonElement>("[data-ftab]").forEach((b) => b.addEventListener("click", () => cb.tab(b.dataset.ftab as "contracts" | "pilot" | "farm")));
+  el.querySelectorAll<HTMLButtonElement>("[data-farm-build]").forEach((b) => b.addEventListener("click", () => cb.farmBuild?.(b.dataset.farmBuild as RigId)));
+  el.querySelector<HTMLButtonElement>("[data-farm-claim]")?.addEventListener("click", () => cb.farmClaim?.());
   el.querySelectorAll<HTMLButtonElement>("[data-accept]").forEach((b) => b.addEventListener("click", () => cb.accept(b.dataset.accept!)));
   el.querySelector<HTMLButtonElement>("[data-abandon]")?.addEventListener("click", () => cb.abandon());
   el.querySelectorAll<HTMLButtonElement>("[data-paint]").forEach((b) => b.addEventListener("click", () => cb.paint(b.dataset.paint!)));
@@ -193,6 +226,9 @@ export function frontierCss(t: { accent: string; accent2: string; muted: string;
 .gf-warp b{display:block;font-size:22px;letter-spacing:.2em;text-transform:uppercase}
 .gf-warp span{font-size:13px;color:${t.accent2};letter-spacing:.12em;text-transform:uppercase}
 .gf-suit .fill{transition:width .2s linear}
+.gf-rig{border:1px solid ${t.border};border-radius:10px;padding:9px 11px;margin:6px 0;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.gf-rig .t{grid-column:1}.gf-rig .t small{color:${t.muted};margin-left:6px}.gf-rig .gf-bar,.gf-rig .s,.gf-rig .c{grid-column:1}.gf-rig .s{font-size:12px;color:${t.muted}}.gf-rig .c{font-size:12px}.gf-rig .c.no{color:${t.danger}}.gf-rig .gf-btn{grid-column:2;grid-row:1 / span 4}
+.gf-rig .track{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}.gf-rig .fill{height:100%}
 .gf-dmg{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s ease;z-index:4;box-shadow:inset 0 0 120px 30px rgba(255,40,40,.75)}
 `;
 }

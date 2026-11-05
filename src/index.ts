@@ -58,6 +58,7 @@ export async function mountGalacticFrontier(container: HTMLElement, options: Mou
 
 export { Game };
 export type { GameOptions, GameOutEvent };
+export { rulesFingerprint, rulesManifest } from "./shared/rules";
 export { QUALITY_PRESETS, DEFAULT_THEME, chooseQuality, type QualityLevel, type QualitySetting, type Theme } from "./core/quality";
 export { PROFILES, resolveTier, effectiveProfile, platformDefaultTier, capabilityCeiling, type GraphicsTier, type GraphicsSetting, type PlatformKind, type RenderProfile } from "./graphics/profiles";
 export { loadDevicePrefs, saveDevicePrefs, type DevicePrefs } from "./persistence/devicePrefs";
