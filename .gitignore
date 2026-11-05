@@ -4,3 +4,4 @@ dist/
 test-results/
 *.log
 m2-results/
+.claude/worktrees/
