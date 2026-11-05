@@ -38,10 +38,13 @@ All run in headless Chromium against the real game. Assists are declared in each
 | `scripts/contracts-e2e.cjs escort` | "Lantern Run": freighter + 4-ship ambush; forced freighter loss → reset; real win; dock | **6/6** — freighter ended at full 320 hull |
 | `scripts/contracts-e2e.cjs boss` | "The Iron Choir": Threnody dreadnought on Noctaris | **9/9** — killed in 484 s, phases 1→2→3, all 8 hardpoints shot off, *Titanfall* unlocked, reward paid; **5 hull/shield top-ups (declared assist)** |
 
-**Known intermittent failure.** The station-defense E2E passed on CI for one commit, then timed out once in wave 2 on the next
-(7 min without clearing; the code change between them was unrelated). Four consecutive local runs passed (wave 2: 44–104 s) so the cause is **not
-yet identified**. The script now dumps every hostile's AI state/distance when a fight times out, and the test pilot chases a hostile that drifts
-beyond 520 m (a declared assist). If it recurs on CI, the log will show where the enemy was stuck; treat that as a possible AI bug until explained.
+**The earlier CI failure of the station/escort E2E — cause found (M8 follow-up).** The station-defense E2E passed on one CI commit and timed
+out on the next. CI logs showed the fight itself was healthy but slow: wave 2 took 356 s of wall-clock time on the runner versus 44–104 s locally,
+and the escort fight then hit a fixed 420 s wall-clock limit while hostiles were still attacking. `CombatSystem.update` clamps each frame to 0.1 s of
+game time, so on a software-rendered runner a fight needs several times more wall time; the test budgets were wall-clock seconds. It was a
+**test-harness budget problem, not a game bug.** Budgets are now **game seconds** read from the combat simulation clock (the fights need 9 / 40 / 53
+game-s; the budget is 240) with a 40-minute wall-clock safety cap, and the chase assist is an approach controller instead of a throttle ratchet.
+Confirmed on CI at commit `410c5aa` (job "Contract E2E (station defense + escort)": success, 9.5 min) and 8/8 + 6/6 locally.
 
 Assists, so nothing is overstated: test hooks install upgrade levels and mark prerequisite contracts done; `aimAtTarget()` points the
 nose (mouse aiming at 1–5 fps is impractical); teleports skip the final approach to the dock; the escort failure is injected by

@@ -35,12 +35,23 @@ jobs:
       - name: Build release web preview (test hooks compiled out)
         run: |
           npm run build:release
+          rm -f dist/web/meta.json
           sha256sum dist/web/index.html | tee dist/web/index.html.sha256
           cp docs/PHONE-TESTING.md dist/web/PHONE-TESTING.md
       - uses: actions/upload-artifact@v4
         with:
           name: galactic-frontier-web-preview
           path: dist/web/
+          if-no-files-found: error
+      - name: Build Galactic Frontier Lite (Telegram Mini App package, test hooks compiled out)
+        run: |
+          npm run build:telegram
+          sha256sum dist/telegram/index.html | tee dist/telegram/index.html.sha256
+          rm -f dist/telegram/meta.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: galactic-frontier-telegram-lite
+          path: dist/telegram/
           if-no-files-found: error
 
   android-apk:
@@ -106,6 +117,31 @@ jobs:
         with:
           name: journey-basic
           path: test-results/journey/
+
+  # M8: the real Lite (Telegram) bundle plays the same journey, and both packages must produce identical rules/outcomes.
+  lite-and-parity:
+    name: Lite journey + Lite/Full parity
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview && npm run build:telegram-test
+      - name: Required journey on the Lite bundle
+        run: GF_BUILD=telegram-test node scripts/journey-test.cjs test-results/journey-lite basic
+      - name: Parity - same rules fingerprint, costs, farming and stats in Lite and Full
+        run: node scripts/parity-test.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lite-journey-and-parity
+          path: test-results/journey-lite/
 
   # Heavier tiers: software rendering makes these slow, so they run on request (workflow_dispatch full_e2e).
   journey-heavy:

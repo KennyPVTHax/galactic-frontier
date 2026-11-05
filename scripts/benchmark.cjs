@@ -18,13 +18,16 @@ const fs = require("fs");
 
 const OUT = path.resolve(process.argv[2] || "test-results/benchmark.json");
 const SECONDS = Number(process.argv[3] || 12);
-const URL = "file://" + path.resolve(__dirname, "../dist/preview/index.html");
+const urlOf = (build) => "file://" + path.resolve(__dirname, `../dist/${build}/index.html`);
 const ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--enable-precise-memory-info"];
 
+// `build` selects the PACKAGE under test: "preview" = Full (Android/desktop), "telegram-test" = Lite (Telegram Mini App).
+// The two packages are benchmarked separately and must be compared only on the same machine.
 const RUNS = [
-  { name: "telegram-basic", tier: "basic", ctx: { ...devices["Pixel 7"], isMobile: true, hasTouch: true }, viewport: { width: 915, height: 412 } },
-  { name: "desktop-enhanced", tier: "enhanced", ctx: {}, viewport: { width: 1280, height: 720 } },
-  { name: "android-extreme-hd", tier: "ultra", ctx: { ...devices["Pixel 7"], isMobile: true, hasTouch: true }, viewport: { width: 915, height: 412 } },
+  { name: "telegram-lite", build: "telegram-test", tier: "basic", ctx: { ...devices["Pixel 7"], isMobile: true, hasTouch: true }, viewport: { width: 915, height: 412 } },
+  { name: "telegram-basic", build: "preview", tier: "basic", ctx: { ...devices["Pixel 7"], isMobile: true, hasTouch: true }, viewport: { width: 915, height: 412 } },
+  { name: "desktop-enhanced", build: "preview", tier: "enhanced", ctx: {}, viewport: { width: 1280, height: 720 } },
+  { name: "android-extreme-hd", build: "preview", tier: "ultra", ctx: { ...devices["Pixel 7"], isMobile: true, hasTouch: true }, viewport: { width: 915, height: 412 } },
 ];
 
 function pct(sorted, p) {
@@ -85,7 +88,7 @@ async function run(browser, r) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const t0 = Date.now();
-  await page.goto(`${URL}?debug=1&quality=${r.tier}&start=new&slot=bench-${r.name}`);
+  await page.goto(`${urlOf(r.build)}?debug=1&quality=${r.tier}&start=new&slot=bench-${r.name}${process.env.GF_BENCH_CINEMATIC ? "&cinematic=" + process.env.GF_BENCH_CINEMATIC : ""}`);
   await page.waitForFunction(() => window.__GF && window.__GF.state().mode === "ship", null, { timeout: 240000, polling: 200 });
   const loadMs = Date.now() - t0;
   await page.evaluate(() => {
@@ -124,7 +127,7 @@ async function run(browser, r) {
 (async () => {
   const browser = await chromium.launch({ args: ARGS });
   const results = { note: "Headless Chromium + SwiftShader (CPU). Not representative of real devices.", date: new Date().toISOString(), seconds: SECONDS, runs: [] };
-  for (const r of RUNS) {
+  for (const r of RUNS.filter((x) => !process.env.GF_BENCH || process.env.GF_BENCH.split(",").includes(x.name))) {
     const res = await run(browser, r);
     results.runs.push(res);
     const f = res.flight;

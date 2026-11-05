@@ -141,7 +141,9 @@ const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { time
   await page.keyboard.press("KeyE");
   await until(page, () => window.__GF.state().mode === "onFoot", null, 30000);
   await page.keyboard.press("KeyF");
-  await page.waitForTimeout(500);
+  // The scan is handled by the game loop; on a <1 fps software tier a fixed 0.5 s sleep can elapse before a single frame ran.
+  // Wait for the game's response (bounded); a real failure still reports tagged 0.
+  await until(page, () => window.__GF.state().tagged > 0, null, 30000).catch(() => {});
   s = await st(page);
   check(12, "lands on Aetherion, steps out and scans (F)", s.tagged > 0 && s.contract?.title === "Return to Halcyon Dock", `tagged ${s.tagged}, contract: ${s.contract?.title}  [debug: teleport to landing site]`);
   await shot("12-surface-scan.png");
