@@ -16,3 +16,12 @@ Rules: commercial use allowed; redistribution inside an APK allowed; engine rest
 | Adobe Mixamo | Royalty-free incl. commercial use, Adobe terms | Confirm terms for redistribution of animation data inside a shipped game; account sign-in by owner |
 | Sketchfab | Per-model CC licence | Per-model; reject NC / ND / unclear |
 | Fab / Epic library | Per-listing: some "standard" (engine-restricted to Unreal), some usable in any engine | Read each listing's licence; do not assume Unreal-only content may be used in Unity |
+
+## Added 2026-11-06 (premium Unity slice)
+
+| Asset | Creator | Source | Licence | Notes |
+|---|---|---|---|---|
+| Universal Animation Library [Standard] (clips: Idle, Walk, Jog, Sprint, Jump start/loop/land, Interact, Pistol aim, Idle torch) | Quaternius | https://opengameart.org/content/universal-animation-library | CC0 1.0 | Zip SHA-256 `18FF1A72…A3AC2`. Retargeted onto the tnnv skeleton in Blender (`scripts/premium/blender/retarget_astronaut.py`); raw files not committed (`unity/SourceAssets/`) |
+| Universal Animation Library 2 [Standard] (clips: TreeChopping_Loop → Mine, NinjaJump_Idle, Chest_Open) | Quaternius | https://opengameart.org/content/universal-animation-library-2 | CC0 1.0 | Zip SHA-256 `EC0E40D6…1A9217` |
+| Poly Haven rocks: boulder_01, rock_07, namaqualand_boulder_02/03/05, namaqualand_cliff_01 | Poly Haven artists (see `_provenance.json`) | https://polyhaven.com | CC0 1.0 | 1k textures; fetched + MD5-verified by `scripts/premium/fetch-polyhaven.mjs`; decimated to 3 LODs in Blender |
+| Poly Haven ground textures: forest_ground_04, brown_mud_leaves_01, aerial_rocks_02, dry_ground_rocks | Poly Haven artists | https://polyhaven.com | CC0 1.0 | Same pipeline |

@@ -35,6 +35,7 @@ namespace GF.EditorTools
             var grassMat = BuildGrassMaterial();
             var waterMat = BuildWaterMaterial();
             var rocks = BuildRockPrefabs();
+            AstronautBuilder.Build();
             BuildScene(terrainMat, grassMat, waterMat, rocks);
             AssetDatabase.SaveAssets();
             Debug.Log("[GF] Aetherion scene built: Assets/Scenes/Aetherion.unity");
@@ -305,6 +306,15 @@ namespace GF.EditorTools
 
         void OnPreprocessTexture()
         {
+            if (assetPath.StartsWith("Assets/Generated/Astronaut/Textures"))
+            {
+                var at = (TextureImporter)assetImporter;
+                at.sRGBTexture = assetPath.Contains("_base");
+                at.textureType = TextureImporterType.Default;
+                at.maxTextureSize = 2048; at.mipmapEnabled = true; at.anisoLevel = 8;
+                at.textureCompression = TextureImporterCompression.CompressedHQ;
+                return;
+            }
             if (!(assetPath.StartsWith("Assets/Generated/Rocks") || assetPath.StartsWith("Assets/ThirdParty/PolyHaven"))) return;
             var ti = (TextureImporter)assetImporter;
             bool colour = assetPath.Contains("_diff_");

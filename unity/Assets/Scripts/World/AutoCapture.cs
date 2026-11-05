@@ -68,11 +68,54 @@ namespace GF.World
                 yield return null;
             }
 
-            // jump + jetpack
-            var jf = new InputFrame { jumpPressed = true, jumpHeld = true };
-            player.Tick(0.016f, jf, rig.YawRadians, false);
-            for (int k = 0; k < 40; k++) { jf.jumpPressed = false; jf.moveY = 0.5f; player.Tick(0.016f, jf, rig.YawRadians, false); yield return null; }
-            yield return Shot("20_jetpack");
+            // ---- astronaut close-ups: idle (front), walk, sprint, jetpack (behind)
+            float faceDeg() => player.Facing * Mathf.Rad2Deg;
+            rig.Distance = 3.4f; rig.Pitch = 6f;
+            rig.Yaw = faceDeg() + 180f;
+            for (int f = 0; f < 70; f++) { player.Tick(0.016f, new InputFrame(), rig.YawRadians, false); yield return null; }
+            yield return Shot("30_idle_front");
+            rig.Yaw = faceDeg() + 60f;
+            for (int f = 0; f < 20; f++) { player.Tick(0.016f, new InputFrame(), rig.YawRadians, false); yield return null; }
+            yield return Shot("31_idle_side");
+
+            float camYawFixed = faceDeg();
+            for (int phase = 0; phase < 2; phase++)
+            {
+                float t2 = 0, dur = 3.2f; bool s1 = false, s2 = false;
+                while (t2 < dur)
+                {
+                    float dt = Mathf.Min(Time.deltaTime, 0.05f); t2 += dt;
+                    rig.Yaw = camYawFixed + 75f;
+                    player.Tick(dt, new InputFrame { moveY = 1f, sprint = phase == 1 }, camYawFixed * Mathf.Deg2Rad, false);
+                    if (!s1 && t2 > 1.6f) { s1 = true; yield return Shot($"3{2 + phase}_{(phase == 0 ? "walk" : "sprint")}_a"); }
+                    if (!s2 && t2 > 2.6f) { s2 = true; yield return Shot($"3{2 + phase}_{(phase == 0 ? "walk" : "sprint")}_b"); }
+                    yield return null;
+                }
+            }
+            // jetpack: jump, hold thrust (game-time), camera low behind then from the side
+            rig.Distance = 3.6f; rig.Pitch = 4f;
+            float tj = 0; bool j1 = false, j2 = false, j3 = false;
+            player.Tick(0.016f, new InputFrame { jumpPressed = true, jumpHeld = true }, rig.YawRadians, false);
+            while (tj < 4.0f)
+            {
+                float dt = Mathf.Min(Time.deltaTime, 0.05f); tj += dt;
+                player.Tick(dt, new InputFrame { jumpHeld = true }, rig.YawRadians, false);
+                rig.Yaw = player.Facing * Mathf.Rad2Deg + (tj < 2.2f ? 12f : 110f);
+                if (!j1 && tj > 1.0f) { j1 = true; yield return Shot("40_jet_1.0s"); }
+                if (!j2 && tj > 1.8f) { j2 = true; yield return Shot("40_jet_1.8s"); }
+                if (!j3 && tj > 3.0f) { j3 = true; yield return Shot("40_jet_3.0s"); }
+                yield return null;
+            }
+            // release and fall
+            float tf = 0; bool f1 = false;
+            while (tf < 2.5f)
+            {
+                float dt = Mathf.Min(Time.deltaTime, 0.05f); tf += dt;
+                player.Tick(dt, new InputFrame(), rig.YawRadians, false);
+                if (!f1 && tf > 0.5f) { f1 = true; yield return Shot("41_fall"); }
+                yield return null;
+            }
+            yield return Shot("42_landed");
 
             WritePerf();
             Application.Quit(0);

@@ -40,6 +40,7 @@ namespace GF.Player
         public float Lean { get; private set; }
         public float TimeSinceLanded { get; private set; } = 99f;
         public bool JustJumped { get; private set; }
+        public bool Aiming { get; private set; }
         public bool Landed { get; private set; }
         public float LandImpact { get; private set; }
 
@@ -65,6 +66,7 @@ namespace GF.Player
 
         public void Tick(float dt, InputFrame input, float camYaw, bool aiming)
         {
+            Aiming = aiming;
             Vector3 pos = transform.position;
             float fx = Mathf.Sin(camYaw), fz = Mathf.Cos(camYaw);
             float rx = Mathf.Cos(camYaw), rz = -Mathf.Sin(camYaw);

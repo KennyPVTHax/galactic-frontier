@@ -56,6 +56,7 @@ namespace GF.World
             {
                 var a = Instantiate(AstronautPrefab, pgo.transform);
                 a.transform.localPosition = Vector3.zero; a.transform.localRotation = Quaternion.identity;
+                foreach (var aa in a.GetComponentsInChildren<AstronautAnimator>()) aa.Player = Player;
             }
             else BuildPlaceholderAstronaut(pgo.transform, PlaceholderMaterial);
 
