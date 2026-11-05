@@ -23,3 +23,5 @@
 /ImportQueue/
 /Captures/
 /Builds/
+/Tools/**/bin/
+/Tools/**/obj/

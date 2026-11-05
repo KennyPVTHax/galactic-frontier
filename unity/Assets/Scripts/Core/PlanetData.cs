@@ -19,6 +19,7 @@ namespace GF.Core
         public double rivers = 0, riverWidth = 0.025, riverDepth = 3, calderas = 0;
         public double basins = 0, basinMin = 40, basinRange = 50, basinDepth = 4, siteLift = 0;
         public bool siteCrater = false, poiPads = false;
+        public TerrainParams ShallowClone() => (TerrainParams)MemberwiseClone();
     }
 
     [Serializable] public class LiquidDef { public string kind; public double level; public float[] color; public float emissive; }
@@ -47,6 +48,15 @@ namespace GF.Core
         public TerrainParams terrain;
         public PaletteData palette;
         public PoiData[] pois;
+
+        /// <summary>Same planet without the artificial edge-mountain ring (identical for r &lt; 540 m).</summary>
+        public PlanetData CloneNoMountains()
+        {
+            var p = (PlanetData)MemberwiseClone();
+            p.terrain = terrain.ShallowClone();
+            p.terrain.mountainAmp = 0; p.terrain.mountainBase = 0;
+            return p;
+        }
 
 #if UNITY_5_3_OR_NEWER
         public static PlanetData FromJson(string json) => JsonUtility.FromJson<PlanetData>(json);
