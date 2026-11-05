@@ -9,7 +9,7 @@ import type { ResourceId } from "../gameplay/resources";
 import type { GraphicsTier } from "../graphics/profiles";
 import type { PlanetId } from "../universe/types";
 import { deriveStats, sanitizeLevels } from "../gameplay/upgrades";
-import { rulesFingerprint } from "../shared/rules";
+import { rulesFingerprint, rulesManifest } from "../shared/rules";
 
 export function installDebugHooks(g: any): void {
   (window as any).__GF = {
@@ -62,6 +62,11 @@ export function installDebugHooks(g: any): void {
       drawCalls: (g.engine as any)._drawCalls?.current ?? null,
       activeMeshes: g.scene.getActiveMeshes().length,
     }),
+    /** Parity-test hooks: the exact code paths the UI uses, with an explicit clock so both packages can be compared. */
+    rulesManifest: () => rulesManifest(),
+    farmBuild: (id: any, now: number) => g.farmBuildAction(id, now),
+    farmClaim: (now: number) => g.farmClaimAction(now),
+    derivedStats: () => g.stats,
     teleportShip: (x: number, y: number, z: number, yaw = g.ship.yaw) => Object.assign(g.ship, { x, y, z, yaw, speed: 0, throttle: 0, pitch: 0 }),
     teleportPlayer: (x: number, z: number) => g.player.place(x, z, g.planet, g.player.facing),
     give: (id: ResourceId, n: number) => {

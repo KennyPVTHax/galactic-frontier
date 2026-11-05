@@ -1923,20 +1923,11 @@ export class Game {
         this.openFrontier();
       },
       farmBuild: (id) => {
-        const r = farmBuildOrUpgrade(this.farm, id, this.inventory, Date.now());
-        if (r.ok) {
-          this.farm = r.farm;
-          this.hud.toast(`${getRig(id).name} ${this.farm[id].level === 1 ? "built" : `upgraded to level ${this.farm[id].level}`}`, "good");
-          void this.save();
-        } else this.hud.toast(r.reason === "funds" ? "Not enough resources" : "Already at maximum", "warn");
+        this.farmBuildAction(id);
         this.openFrontier();
       },
       farmClaim: () => {
-        const r = farmClaimAll(this.farm, this.inventory, Date.now());
-        this.farm = r.farm;
-        const parts = (Object.entries(r.gained) as [ResourceId, number][]).filter(([, n]) => n > 0).map(([id, n]) => `+${n} ${RESOURCES[id].name}`);
-        this.hud.toast(parts.length ? `Harvest delivered: ${parts.join(" · ")}${r.blocked ? ` (${r.blocked} left — cargo full)` : ""}` : r.blocked ? "Cargo hold full — upgrade Cargo Lattice" : "Nothing to claim yet", parts.length ? "good" : "info");
-        void this.save();
+        this.farmClaimAction();
         this.openFrontier();
       },
       paint: (id) => {
@@ -1947,6 +1938,27 @@ export class Game {
         this.openFrontier();
       },
     });
+  }
+
+  /** Build / upgrade a harvester (the single code path for the UI and the parity tests). */
+  farmBuildAction(id: RigId, now = Date.now()): boolean {
+    const r = farmBuildOrUpgrade(this.farm, id, this.inventory, now);
+    if (r.ok) {
+      this.farm = r.farm;
+      this.hud.toast(`${getRig(id).name} ${this.farm[id].level === 1 ? "built" : `upgraded to level ${this.farm[id].level}`}`, "good");
+      void this.save();
+    } else this.hud.toast(r.reason === "funds" ? "Not enough resources" : "Already at maximum", "warn");
+    return r.ok;
+  }
+
+  /** Claim harvester output into the inventory (the single code path for the UI and the parity tests). */
+  farmClaimAction(now = Date.now()): Partial<Record<ResourceId, number>> {
+    const r = farmClaimAll(this.farm, this.inventory, now);
+    this.farm = r.farm;
+    const parts = (Object.entries(r.gained) as [ResourceId, number][]).filter(([, n]) => n > 0).map(([id, n]) => `+${n} ${RESOURCES[id].name}`);
+    this.hud.toast(parts.length ? `Harvest delivered: ${parts.join(" · ")}${r.blocked ? ` (${r.blocked} left — cargo full)` : ""}` : r.blocked ? "Cargo hold full — upgrade Cargo Lattice" : "Nothing to claim yet", parts.length ? "good" : "info");
+    void this.save();
+    return r.gained;
   }
 
   private farmView() {

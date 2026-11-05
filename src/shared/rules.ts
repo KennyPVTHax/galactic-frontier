@@ -122,9 +122,14 @@ export function rulesManifest(): RulesManifest {
   };
 }
 
-/** Canonical JSON: sorted keys, no whitespace. */
+/**
+ * Canonical JSON: sorted keys, no whitespace, non-integers rounded to 9 decimals.
+ * The rounding is load-bearing: rule data includes values derived with Math.sin/cos/atan2 (e.g. planet arrival yaw), and
+ * different JS engines (V8 in Android WebView / Node, JavaScriptCore in iOS Telegram) may differ in the last bit of those.
+ * Found by tests/parity: Node and Chromium disagreed by 1 ulp, which would have made every client report "rules-mismatch".
+ */
 export function canonicalJson(v: unknown): string {
-  return JSON.stringify(toPlain(v));
+  return JSON.stringify(toPlain(v), (_k, x) => (typeof x === "number" && Number.isFinite(x) && !Number.isInteger(x) ? Math.round(x * 1e9) / 1e9 : x));
 }
 
 /** cyrb53 — a fast, well-distributed 53-bit hash. A *fingerprint* for drift detection, not a security primitive. */
