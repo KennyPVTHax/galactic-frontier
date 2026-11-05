@@ -54,3 +54,8 @@ import "@babylonjs/core/PostProcesses/RenderPipeline/postProcessRenderPipelineMa
 import "@babylonjs/core/Materials/Textures/baseTexture.polynomial";
 import "@babylonjs/core/Rendering/depthRendererSceneComponent";
 import "@babylonjs/core/Engines/Extensions/engine.query";
+
+// ---- M3 graphics (append-only)
+export { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
+export { PostProcess } from "@babylonjs/core/PostProcesses/postProcess";
+export { Constants } from "@babylonjs/core/Engines/constants";
