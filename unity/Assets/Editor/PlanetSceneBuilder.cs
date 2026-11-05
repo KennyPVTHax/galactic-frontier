@@ -24,6 +24,9 @@ namespace GF.EditorTools
             var flatTerrain = AetherionBuilder.BuildTerrainMaterial();     // also (re)builds the texture arrays
             var flatWater = AetherionBuilder.BuildWaterMaterial();
             var astro = AstronautBuilder.Build();
+            var rocks = AetherionBuilder.BuildRockPrefabs();
+            var grass = AetherionBuilder.BuildGrassMaterial();
+            Directory.CreateDirectory("Assets/Resources/Authored");
             var p = AetherionBuilder.LoadPlanet();
 
             var terrain = AetherionBuilder.MakeMaterial("Planet_Terrain", "GF/PlanetTerrain"); terrain.CopyPropertiesFromMaterial(flatTerrain);
@@ -53,6 +56,7 @@ namespace GF.EditorTools
             var boot = bgo.AddComponent<PlanetBootstrap>();
             boot.PlanetJson = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/GameData/aetherion.json");
             boot.TerrainMat = terrain; boot.WaterMat = water; boot.SkyMat = sky; boot.AstronautPrefab = astro; boot.Sun = sun; boot.SkyLight = skyL;
+            boot.GrassMat = grass; boot.PropPrefabs = rocks; boot.PropKeys = System.Array.ConvertAll(rocks, r => r.name);
             bgo.AddComponent<SphereTestRunner>();
 
             Directory.CreateDirectory("Assets/Scenes");

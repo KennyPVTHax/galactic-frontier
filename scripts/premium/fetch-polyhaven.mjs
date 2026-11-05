@@ -12,7 +12,7 @@ const UA = { "User-Agent": "GalacticFrontier-dev (idkenny518@gmail.com)" };
 const RES = "1k"; // mobile-first; upgrade per asset later
 
 const MODELS = ["boulder_01", "rock_07", "namaqualand_boulder_02", "namaqualand_boulder_03", "namaqualand_boulder_05", "namaqualand_cliff_01"];
-const TEXTURES = ["forest_ground_04", "brown_mud_leaves_01", "aerial_rocks_02", "dry_ground_rocks"];
+const TEXTURES = ["forest_ground_04", "brown_mud_leaves_01", "aerial_rocks_02", "dry_ground_rocks", "coast_sand_01"];
 const TEX_MAPS = [["Diffuse", "diff"], ["nor_gl", "nor_gl"], ["arm", "arm"]]; // arm = AO(R) Rough(G) Metal(B)
 
 const json = async (u) => { const r = await fetch(u, { headers: UA }); if (!r.ok) throw new Error(`${r.status} ${u}`); return r.json(); };

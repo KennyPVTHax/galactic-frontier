@@ -22,7 +22,7 @@ namespace GF.EditorTools
     {
         const string PH = "Assets/ThirdParty/PolyHaven";
         const string Gen = "Assets/Generated";
-        static readonly string[] GroundLayers = { "forest_ground_04", "brown_mud_leaves_01", "aerial_rocks_02", "dry_ground_rocks" };
+        static readonly string[] GroundLayers = { "forest_ground_04", "brown_mud_leaves_01", "aerial_rocks_02", "coast_sand_01" };
         static readonly string[] RockIds = { "namaqualand_boulder_02", "namaqualand_boulder_03", "namaqualand_boulder_05", "boulder_01", "namaqualand_cliff_01", "rock_07" };
 
         [MenuItem("Tools/Galactic Frontier/Build Aetherion Scene")]
@@ -127,7 +127,7 @@ namespace GF.EditorTools
             return m;
         }
 
-        static Material BuildGrassMaterial()
+        internal static Material BuildGrassMaterial()
         {
             var p = LoadPlanet();
             var m = MakeMaterial("Aetherion_Grass", "GF/Grass");
@@ -150,7 +150,7 @@ namespace GF.EditorTools
         }
 
         // ------------------------------------------------------------------ rocks
-        static GameObject[] BuildRockPrefabs()
+        internal static GameObject[] BuildRockPrefabs()
         {
             Directory.CreateDirectory($"{Gen}/Prefabs");
             var list = new List<GameObject>();

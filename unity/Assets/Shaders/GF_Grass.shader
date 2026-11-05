@@ -28,6 +28,7 @@ Shader "GF/Grass"
     float4 _GF_Wind;        // xy dir, z strength, w time
     float4 _GF_WindGust;    // x speed, y scale
     float4 _GF_Interactor;  // xyz pos, w radius
+    float4 _GF_PlanetCenter; // xyz centre, w radius (0 = flat world)
 
     float hash21(float2 p) { p = frac(p * float2(123.34, 456.21)); p += dot(p, p + 45.32); return frac(p.x * p.y); }
     float vnoise(float2 p)
@@ -64,40 +65,44 @@ Shader "GF/Grass"
         float side = IN.posOS.x;                 // -0.5 .. 0.5
         float t2 = t * t;
 
+        float3 up = _GF_PlanetCenter.w > 0.5 ? normalize(root - _GF_PlanetCenter.xyz) : float3(0, 1, 0);
+        float3 refA = abs(up.z) < 0.9 ? float3(0, 0, 1) : float3(1, 0, 0);
+        float3 tg1 = normalize(cross(up, refA)); float3 tg2 = cross(tg1, up);
         float sy, cy; sincos(yaw, sy, cy);
-        float3 fwd = float3(sy, 0, cy);
-        float3 right = float3(cy, 0, -sy);
+        float3 fwd = tg1 * sy + tg2 * cy;
+        float3 right = tg1 * cy - tg2 * sy;
+        float2 rp = root.xz + (_GF_PlanetCenter.w > 0.5 ? root.yy * 0.37 : float2(0, 0));
 
         // --- wind: travelling gust fronts + slow swell + per-blade flutter
         float2 wd = normalize(_GF_Wind.xy + 1e-5);
         float gs = _GF_WindGust.y;
-        float2 gp = root.xz * gs - wd * (_GF_Wind.w * _GF_WindGust.x * gs);
+        float2 gp = rp * gs - wd * (_GF_Wind.w * _GF_WindGust.x * gs);
         float g = vnoise(gp) * 0.62 + vnoise(gp * 2.7 + 7.1) * 0.38;
         float front = smoothstep(0.30, 0.82, g);
-        float swell = 0.5 + 0.5 * sin(dot(root.xz, wd) * 0.12 - _GF_Wind.w * 1.9);
+        float swell = 0.5 + 0.5 * sin(dot(rp, wd) * 0.12 - _GF_Wind.w * 1.9);
         float amount = _GF_Wind.z * (0.22 + 0.78 * front + 0.22 * swell);
-        float flutter = sin(_GF_Wind.w * (3.2 + seed * 2.5) + seed * 40.0 + dot(root.xz, float2(0.7, 0.3))) * (0.04 + 0.10 * amount);
+        float flutter = sin(_GF_Wind.w * (3.2 + seed * 2.5) + seed * 40.0 + dot(rp, float2(0.7, 0.3))) * (0.04 + 0.10 * amount);
 
-        float3 disp = float3(wd.x, 0, wd.y) * (amount * _WindBend * height * t2)
-                    + float3(-wd.y, 0, wd.x) * (flutter * height * t2)
+        float3 disp = (tg1 * wd.x + tg2 * wd.y) * (amount * _WindBend * height * t2)
+                    + (tg1 * (-wd.y) + tg2 * wd.x) * (flutter * height * t2)
                     + fwd * (lean * height * t2);
 
         // --- player / ship interaction: bend away and flatten
-        float2 away = root.xz - _GF_Interactor.xz;
+        float3 away = root - _GF_Interactor.xyz; away -= up * dot(away, up);
         float ad = length(away) + 1e-4;
         float push = saturate(1.0 - ad / _GF_Interactor.w);
         push *= push;
-        disp += float3(away.x / ad, 0, away.y / ad) * (push * height * 0.95 * t);
+        disp += (away / ad) * (push * height * 0.95 * t);
         height *= 1.0 - 0.45 * push;
 
         float taper = 1.0 - t * 0.88;
-        float3 pos = root + right * (side * width * taper) + float3(0, t * height, 0) + disp;
+        float3 pos = root + right * (side * width * taper) + up * (t * height) + disp;
         // keep blade length roughly constant when bent
-        pos.y -= dot(disp, disp) / (2.0 * max(height, 0.05)) * 0.6;
+        pos -= up * (dot(disp, disp) / (2.0 * max(height, 0.05)) * 0.6);
 
         // rounded normal blended toward up (soft, non-harsh two-sided lighting)
         float3 n = normalize(fwd + right * (side * 1.1));
-        n = normalize(lerp(n, float3(0, 1, 0), 0.45 + 0.2 * t));
+        n = normalize(lerp(n, up, 0.45 + 0.2 * t));
 
         Varyings OUT;
         OUT.posWS = pos;

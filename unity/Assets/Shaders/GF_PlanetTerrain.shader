@@ -45,13 +45,15 @@ Shader "GF/PlanetTerrain"
 
             float4 _GF_PlanetCenter;   // xyz centre, w radius (set globally)
 
-            struct Attributes { float4 posOS : POSITION; float3 nrmOS : NORMAL; };
+            struct Attributes { float4 posOS : POSITION; float3 nrmOS : NORMAL; float4 col : COLOR; float2 uv : TEXCOORD0; };
             struct Varyings
             {
                 float4 posCS : SV_POSITION;
                 float3 posWS : TEXCOORD0;
                 float3 nrmWS : TEXCOORD1;
                 float fog : TEXCOORD2;
+                float4 col : TEXCOORD3;
+                float ovr : TEXCOORD4;
             };
 
             float hash21(float2 p) { p = frac(p * float2(123.34, 456.21)); p += dot(p, p + 45.32); return frac(p.x * p.y); }
@@ -70,6 +72,7 @@ Shader "GF/PlanetTerrain"
                 OUT.posCS = TransformWorldToHClip(OUT.posWS);
                 OUT.nrmWS = TransformObjectToWorldNormal(IN.nrmOS);
                 OUT.fog = ComputeFogFactor(OUT.posCS.z);
+                OUT.col = IN.col; OUT.ovr = IN.uv.x;
                 return OUT;
             }
 
@@ -156,6 +159,13 @@ Shader "GF/PlanetTerrain"
                 float wSoil = max(0.0, 1.0 - wRock - wGravel - wLitter);
                 float sum = wRock + wGravel + wLitter + wSoil + 1e-4;
                 wRock /= sum; wGravel /= sum; wLitter /= sum; wSoil /= sum;
+                // owner-painted material layers (grass / dirt / rock / sand) replace the procedural blend by 'ovr'
+                float4 pc = IN.col; float ps = pc.x + pc.y + pc.z + pc.w;
+                if (IN.ovr > 0.001 && ps > 0.001)
+                {
+                    pc /= ps;
+                    wSoil = lerp(wSoil, pc.x, IN.ovr); wLitter = lerp(wLitter, pc.y, IN.ovr); wRock = lerp(wRock, pc.z, IN.ovr); wGravel = lerp(wGravel, pc.w, IN.ovr);
+                }
 
                 float3 alb = 0, arm = 0, tn = 0; // tn: accumulated world-space normal contribution (xz-swizzled whiteout)
                 float3 nAcc = 0;
