@@ -719,7 +719,9 @@ export class Game {
 
   private footInteraction(): { text: string; short: string; run: () => void } | null {
     const p = this.player.position;
-    if (this.ship.state === "landed" && Math.hypot(p.x - this.ship.x, p.z - this.ship.z) < 7.5) {
+    // Boarding range must exceed the exit distance (7.5-9 m, see disembark): with a strict "< 7.5" the player stepped out
+    // exactly on the boundary and the Board prompt only appeared if physics happened to nudge them closer.
+    if (this.ship.state === "landed" && Math.hypot(p.x - this.ship.x, p.z - this.ship.z) < 10) {
       return { text: `Board the ${WORLD.shipName}`, short: "Board", run: () => this.enterShip(true) };
     }
     for (const poi of this.planet.pois) {

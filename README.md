@@ -1,5 +1,10 @@
 # OrbitBtc · Galactic Frontier — M3–M6 (planets, combat, missions)
 
+> **M7 (real-device readiness):** standalone **Android debug APK** + offline **web preview** built by GitHub Actions
+> (`.github/workflows/m7-build.yml`), a real-device **performance recorder**, planet-swap leak fixes, a playable dreadnought,
+> and browser E2E tests. Start with [docs/PHONE-TESTING.md](docs/PHONE-TESTING.md) and [docs/M7-REPORT.md](docs/M7-REPORT.md).
+> `npm run build:release` / `build:android-assets` (no test hooks) · `npm run test:leaks` · `npm run test:contracts -- station|escort|boss`.
+
 Original third-person space exploration game (TypeScript + Babylon.js 9). Built on the verified M2 baseline
 (`galactic-frontier-m2-baseline`). **Start with [docs/M3-M6-REPORT.md](docs/M3-M6-REPORT.md)** for what is playable, the test and
 benchmark numbers, bugs found, and the honest list of what is *not* done (notably: no real-device testing).

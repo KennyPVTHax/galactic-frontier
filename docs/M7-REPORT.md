@@ -45,7 +45,16 @@ because a browser pilot cannot evade like a human. Enemy AI, weapons, hits, shie
 contract progression, rewards, XP and saving are all the normal game code with real held-fire input.
 
 ### 3.1 Journey on all three graphics profiles
-JOURNEY_TABLE
+| Graphics profile | Result | Notes |
+|---|---|---|
+| Telegram Basic | **15 / 15**, no page errors | also green on GitHub Actions (job `journey-basic`) |
+| Desktop Enhanced | **15 / 15**, no page errors | software-rendered; waits scale ×2.5 |
+| Android Extreme HD | **15 / 15**, no page errors | software-rendered (< 1 fps); waits scale ×5 |
+
+The first Enhanced/Extreme HD attempt failed at "board the ship" and found a small real bug (inherited from M2): you step out exactly 7.5 m from
+the ship but boarding needed *< 7.5 m*, so the prompt only appeared if physics nudged you closer (it did on fast Basic, not on slow tiers).
+Boarding range is now 10 m. Debug assists in the journey are the same as before (teleport to skip flights, aim helper).
+Heavier tiers run in CI on manual dispatch (`full_e2e`); the numbers above are from this container.
 
 ## 4. Gameplay bugs found by the new tests (all fixed)
 1. **The dreadnought could not be beaten.** Its hardpoints (shield-generator spire, missile racks) sit *inside* its 30 m collision
