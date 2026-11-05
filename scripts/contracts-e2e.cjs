@@ -13,7 +13,8 @@
  * What is assisted (listed so nothing is overstated):
  *   - setup: test hooks install upgrade levels and mark prerequisite contracts complete;
  *   - aiming: window.__GF.aimAtTarget() points the nose at the locked target (mouse aiming at 1–5 fps is impractical)
- *     and raises throttle to chase a hostile that has drifted more than 520 m away;
+ *     and runs a small approach controller (closes in beyond 520 m, eases off in the dogfight);
+ *   - time budgets are in game seconds (the sim advances <= 0.1 s per frame), with a 40-minute wall-clock safety cap;
  *   - long travel: teleports skip the final approach to the docking pad;
  *   - the one forced event is the escort failure path, where an ally is destroyed on purpose (labelled below).
  */
@@ -55,21 +56,28 @@ async function boot(browser, label) {
 }
 
 /** Fires with a held mouse button and keeps the nose on the target until `done(state)` is true. */
-async function fight(page, label, done, timeoutMs, onTick) {
+/**
+ * `simBudgetS` is in GAME seconds (CombatSystem.time). Wall-clock budgets were wrong: the sim advances at most 0.1 s per
+ * rendered frame, so on a slow software renderer (CI: ~4x slower than the dev box) the same fight takes 4x longer.
+ */
+const WALL_CAP_MS = 40 * 60 * 1000;
+async function fight(page, label, done, simBudgetS, onTick) {
   await page.mouse.move(640, 360);
   await page.mouse.down();
   await page.keyboard.press("KeyT");
   const t0 = Date.now();
+  const sim0 = (await st(page)).combat.simTime;
   let lastCycle = t0;
   let outcome = "timeout";
   const log = { minShield: 1e9, minHull: 1e9, maxEnemies: 0 };
-  while (Date.now() - t0 < timeoutMs) {
+  while (Date.now() - t0 < WALL_CAP_MS) {
     await page.evaluate(() => window.__GF.aimAtTarget());
     await page.waitForTimeout(200);
     const s = await st(page);
     log.minShield = Math.min(log.minShield, s.combat.shield);
     log.minHull = Math.min(log.minHull, s.ship.hull);
     log.maxEnemies = Math.max(log.maxEnemies, s.combat.enemies.length);
+    if (s.combat.simTime - sim0 > simBudgetS) break;
     if (onTick) onTick(s);
     // Ship lost: the game recalls the player to Halcyon Dock (docked, Veyra-7) — only a failure if we were elsewhere.
     if (s.ship.state === "docked" && label !== "station" && s.mode === "ship" && s.planet === "veyra7" && Date.now() - t0 > 3000) {
@@ -91,7 +99,7 @@ async function fight(page, label, done, timeoutMs, onTick) {
     const d = await page.evaluate(() => { const x = window.__GF.state(); return x.combat.enemies.map((e) => `${e.type}:${e.state}@${Math.round(Math.hypot(e.x - x.ship.x, e.y - x.ship.y, e.z - x.ship.z))}m(y${Math.round(e.y)})`).join(" ") + ` | ship y${Math.round(x.ship.y)} speed ${Math.round(x.ship.speed)} planet ${x.planet}`; });
     console.log(`  [${label}] fight timed out; hostiles: ${d}`);
   }
-  return { outcome, ...log, seconds: Math.round((Date.now() - t0) / 1000) };
+  return { outcome, ...log, seconds: Math.round((Date.now() - t0) / 1000), gameSeconds: Math.round((await st(page)).combat.simTime - sim0) };
 }
 
 async function warpViaMap(page, planet) {
@@ -138,9 +146,9 @@ async function station(browser) {
     const types = s.combat.enemies.map((e) => e.type).join(",");
     const step0 = stepOf(s);
     if (w === 1) await page.screenshot({ path: path.join(OUT, "station-wave1.jpg"), type: "jpeg", quality: 70 });
-    const r = await fight(page, sc, (x) => stepOf(x) > step0, 420000);
+    const r = await fight(page, sc, (x) => stepOf(x) > step0, 240);
     waves.push({ w, enemies: s.combat.enemies.length, types, stationBefore: station && Math.round(station.hull), ...r });
-    check(sc, `wave ${w} spawned (${s.combat.enemies.length} hostiles: ${types}) and was cleared by real combat`, r.outcome === "done", `${r.seconds}s, min shield ${Math.round(r.minShield)}, min hull ${Math.round(r.minHull)}, max hostiles ${r.maxEnemies}`);
+    check(sc, `wave ${w} spawned (${s.combat.enemies.length} hostiles: ${types}) and was cleared by real combat`, r.outcome === "done", `${r.gameSeconds} game-s (${r.seconds}s wall), min shield ${Math.round(r.minShield)}, min hull ${Math.round(r.minHull)}, max hostiles ${r.maxEnemies}`);
     if (r.outcome !== "done") break;
   }
   s = await st(page);
@@ -184,10 +192,10 @@ async function escort(browser) {
   check(sc, "[forced] freighter lost → objective resets: fresh freighter, and the old ambush is removed (4 hostiles, not 8)", !!fresh && fresh.alive && s.combat.enemies.length === 4, `freighter alive=${fresh && fresh.alive}, hostiles ${s.combat.enemies.length}, contract: ${s.contract && s.contract.title}`);
 
   const step0 = stepOf(s);
-  const r = await fight(page, sc, (x) => stepOf(x) > step0, 420000);
+  const r = await fight(page, sc, (x) => stepOf(x) > step0, 240);
   s = await st(page);
   const fr = s.combat.allies.find((a) => a.kind === "freighter");
-  check(sc, "ambush defeated by real combat while the freighter lives", r.outcome === "done" && !!fr && fr.alive, `${r.seconds}s, freighter hull ${fr ? Math.round(fr.hull) : "n/a"}, min shield ${Math.round(r.minShield)}`);
+  check(sc, "ambush defeated by real combat while the freighter lives", r.outcome === "done" && !!fr && fr.alive, `${r.gameSeconds} game-s (${r.seconds}s wall), freighter hull ${fr ? Math.round(fr.hull) : "n/a"}, min shield ${Math.round(r.minShield)}`);
   check(sc, "contract advances to 'Return to Halcyon Dock'", s.contract && s.contract.title === "Return to Halcyon Dock", s.contract && s.contract.title);
   const xp0 = s.xp;
   await warpViaMap(page, "veyra7");
@@ -225,7 +233,7 @@ async function boss(browser) {
     page,
     sc,
     (x) => stepOf(x) > step0,
-    1500000,
+    900,
     (x) => {
       if (x.combat.boss) {
         phases.add(x.combat.boss.phase);
@@ -239,7 +247,7 @@ async function boss(browser) {
     },
   );
   s = await st(page);
-  check(sc, "fought the dreadnought to the end with real fire", r.outcome === "done", `${r.outcome} after ${r.seconds}s; min shield ${Math.round(r.minShield)}; hull/shield top-ups (declared assist): ${topUps}`);
+  check(sc, "fought the dreadnought to the end with real fire", r.outcome === "done", `${r.outcome} after ${r.gameSeconds} game-s (${r.seconds}s wall); min shield ${Math.round(r.minShield)}; hull/shield top-ups (declared assist): ${topUps}`);
   check(sc, "boss went through multiple phases", phases.size >= 2, [...phases].join(","));
   check(sc, "weapon hardpoints were shot off", minHp < 8, `fewest alive: ${minHp}/8`);
   check(sc, "the dreadnought was destroyed", s.combat.boss === null || !s.combat.boss.alive, JSON.stringify(s.combat.boss));
@@ -248,7 +256,7 @@ async function boss(browser) {
   await page.screenshot({ path: path.join(OUT, "boss-defeated.jpg"), type: "jpeg", quality: 70 });
   // The phase-2 drones outlive the carrier; the warp drive stays offline while hostiles are on your tail, so finish them off.
   if (s.combat.enemies.length > 0) {
-    const mop = await fight(page, sc, (x) => x.combat.enemies.length === 0, 300000);
+    const mop = await fight(page, sc, (x) => x.combat.enemies.length === 0, 200);
     check(sc, "leftover launched drones were hunted down (warp drive is locked while hostiles hunt you)", mop.outcome === "done", `${mop.seconds}s`);
     s = await st(page);
   }

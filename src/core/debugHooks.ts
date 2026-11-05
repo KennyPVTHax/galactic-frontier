@@ -33,7 +33,9 @@ export function installDebugHooks(g: any): void {
       planet: g.planetId,
       combat: {
         enemies: g.combat.enemies().filter((e: any) => e.alive).map((e: any) => ({ id: e.id, type: e.type, name: ENEMY_TYPES[e.type as keyof typeof ENEMY_TYPES].name, state: e.state, x: e.pos.x, y: e.pos.y, z: e.pos.z })),
-        shield: g.combat.playerShield,
+        /** Combat simulation clock (game seconds). Test budgets use this, not wall-clock time: the sim advances at most 0.1 s per frame. */
+      simTime: g.combat.time,
+      shield: g.combat.playerShield,
         maxShield: g.combat.playerMaxShield,
         heat: g.combat.playerHeat,
         shotsFired: g.combatStats.shots,
@@ -111,7 +113,9 @@ export function installDebugHooks(g: any): void {
       g.ship.yaw = Math.atan2(dx, dz);
       g.ship.pitch = Math.atan2(dy, Math.hypot(dx, dz));
       // Test-pilot assist (declared in scripts/contracts-e2e.cjs): chase a hostile that has drifted out of weapon range.
-      if (Math.hypot(dx, dy, dz) > 520) g.ship.throttle = Math.max(g.ship.throttle, 0.9);
+      // (an approach controller, not a ratchet: close in when far, ease off in the dogfight so the nose can track)
+      const dist = Math.hypot(dx, dy, dz);
+      g.ship.throttle = dist > 520 ? 0.9 : dist < 150 ? 0.3 : 0.55;
       return true;
     },
     spawnEncounter: (id: string) => g.spawnContractEncounter(id),
