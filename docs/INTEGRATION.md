@@ -154,3 +154,25 @@ src/integration/backend.ts  BackendClient, OfflineBackend, HttpBackendClient, re
 src/ui/                     DOM HUD + CSS
 tests/                      unit tests;  scripts/smoke-test.cjs  browser playthrough
 ```
+
+## 11. Game ↔ OrbitBtc interface, version 1.1 (M3–M6)
+
+The game stays a separately maintained module. M3–M6 change **nothing** on the OrbitBtc platform: no new endpoints are
+required, and the M1 `BackendClient` contract (v1.0) is still the only server surface. Version 1.1 only adds client-side,
+informational events and save fields.
+
+| Surface | v1.0 (M1/M2) | v1.1 (M3–M6) | Server action required |
+|---|---|---|---|
+| `BackendClient.startMission` / `submitMissionCompletion` | First Light only | unchanged — frontier contracts are **not** submitted | none |
+| `MissionCompletionReport` | unchanged | unchanged | none |
+| Save blob (`SaveData`) | schema v2 | schema v3: `universe`, `progression`, `contracts` added; v1/v2 migrate on load | treat as opaque, untrusted player state |
+| `onEvent` | ready, missionStep, missionComplete, saved, contextLost, error | + `warp {from, to}`, `contractComplete {id}` | optional analytics only |
+
+Rules that still hold:
+
+- Contract rewards, combat loot and pilot XP are **virtual gameplay values** stored in the player's save. They are not
+  Orbit Coins, carry no exchange rate and are never sent as a reward claim. Unit tests assert that contract data, loot and
+  new saves contain no coin fields.
+- If OrbitBtc later wants server-verified contracts, add a `submitContractCompletion` method to `BackendClient` behind a new
+  interface version (v2.0) and keep v1.1 clients working; do not reuse `submitMissionCompletion`.
+- `RemoteSaveAdapter` still stores the whole save blob; servers must never derive balances from it.
