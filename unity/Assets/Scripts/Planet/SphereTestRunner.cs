@@ -42,6 +42,8 @@ namespace GF.Planet
             return (d * Math.Cos(th) + h * Math.Sin(th)).Normalized;
         }
 
+        Vec3d? startOverride;
+
         IEnumerator Start()
         {
             if (!enabled) yield break;
@@ -52,8 +54,30 @@ namespace GF.Planet
             Add("gpu", "\"" + SystemInfo.graphicsDeviceName + "\"");
             Add("radiusM", F(R));
 
+            startOverride = new Vec3d(boot.Player.PosD.x, boot.Player.PosD.y, boot.Player.PosD.z).Normalized;
             // ---------- surface at the landing site
             yield return Shot("00_landing");
+            // ---------- owner-authored demo region (loaded from Resources/Authored)
+            for (int f = 0; f < 90; f++) yield return null;
+            int propsAtStart = boot.Props != null ? boot.Props.LiveCount : -1;
+            var idsAtStart = new List<string>(); if (boot.Props != null) foreach (var kv in boot.Props.Live) idsAtStart.Add(kv.Key); idsAtStart.Sort();
+            Add("authoredWorld", "\"" + boot.World.Summary() + "\"");
+            var an = player.GetComponentInChildren<Animator>();
+            string animInfo = "none";
+            if (an != null) { var infos = an.GetCurrentAnimatorClipInfo(0); var sb = new StringBuilder(); foreach (var ci in infos) sb.Append(ci.clip.name + ":" + ci.weight.ToString("0.00") + " "); animInfo = $"enabled={an.enabled} controller={(an.runtimeAnimatorController != null)} speedParam={an.GetFloat("Speed"):0.00} grounded={an.GetBool("Grounded")} clips=[{sb}]"; }
+            Add("astronautAnimator", "\"" + animInfo + "\"");
+            Add("authoredPropsLiveAtStart", propsAtStart.ToString());
+            Add("authoredGrassCellsAtStart", (boot.Grass != null ? boot.Grass.LiveCells : -1).ToString());
+            Vector3 fwd0 = rig.Forward;
+            string[] dnames = { "01_demo_north", "01_demo_east", "01_demo_south", "01_demo_west" };
+            for (int q = 0; q < 4; q++)
+            {
+                rig.Forward = Quaternion.AngleAxis(90f * q, player.Up) * fwd0; rig.Pitch = 16f; rig.Distance = 5f;
+                for (int f = 0; f < 25; f++) yield return null;
+                yield return Shot(dnames[q]);
+            }
+            rig.Forward = fwd0; rig.Pitch = 6f; rig.Distance = 2.8f; for (int f = 0; f < 25; f++) yield return null; yield return Shot("02_demo_close");
+            rig.Pitch = 16f; rig.Distance = 4.6f;
 
             // ---------- globe overview from space
             rig.FreeOrbit = true; player.gameObject.SetActive(true);
@@ -142,7 +166,7 @@ namespace GF.Planet
             rig.FreeOrbit = true;
             var frameMs = new List<float>(); long peakMesh = 0; int peakActive = 0, peakQueued = 0, builtAt0 = tree.TotalBuilt, releasedAt0 = tree.TotalReleased; double travelled = 0;
             var memSamples = new List<long>();
-            float tf = 0;
+            float tf = 0; int gc0 = GC.CollectionCount(0), gc1 = GC.CollectionCount(1), gc2 = GC.CollectionCount(2); float worstFrame = 0, worstFrameAt = 0; int worstQueued = 0, worstBuilt = 0;
             while (tf < 24f)
             {
                 float dt = Mathf.Min(Time.deltaTime, 0.05f); tf += dt;
@@ -153,7 +177,8 @@ namespace GF.Planet
                 double rr = R + boot.Field.Height(pos) + alt;
                 cam.transform.position = new Vector3((float)(pos.x * rr), (float)(pos.y * rr), (float)(pos.z * rr));
                 cam.transform.rotation = Quaternion.LookRotation(head, V(pos));
-                frameMs.Add(Time.unscaledDeltaTime * 1000f);
+                float fm = Time.unscaledDeltaTime * 1000f; frameMs.Add(fm);
+                if (fm > worstFrame) { worstFrame = fm; worstFrameAt = tf; worstQueued = tree.QueuedCount; worstBuilt = tree.TotalBuilt - builtAt0; }
                 peakMesh = Math.Max(peakMesh, tree.MeshBytes); peakActive = Math.Max(peakActive, tree.ActiveCount); peakQueued = Math.Max(peakQueued, tree.QueuedCount);
                 if (frameMs.Count % 60 == 0) memSamples.Add(UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong());
                 if (tf > 8f && tf < 8.05f) yield return Shot("30_flyover_a");
@@ -165,8 +190,18 @@ namespace GF.Planet
             frameMs.Sort();
             float avg = 0; foreach (var m in frameMs) avg += m; avg /= Mathf.Max(1, frameMs.Count);
             json.Append($",\n  \"flyover\": {{\"speedMps\":250,\"travelledM\":{F(travelled)},\"frames\":{frameMs.Count},\"avgMs\":{F(avg)},\"p99Ms\":{F(frameMs[(int)(frameMs.Count * 0.99f)])},\"maxMs\":{F(frameMs[frameMs.Count - 1])}," +
-                        $"\"patchesBuilt\":{tree.TotalBuilt - builtAt0},\"patchesReleased\":{tree.TotalReleased - releasedAt0},\"peakActivePatches\":{peakActive},\"peakQueued\":{peakQueued},\"peakMeshMB\":{F(peakMesh / 1048576.0)},\"finalMeshMB\":{F(tree.MeshBytes / 1048576.0)},\"finalActivePatches\":{tree.ActiveCount}}}");
+                        $"\"worstFrameMs\":{F(worstFrame)},\"worstFrameAtS\":{F(worstFrameAt)},\"worstFrameQueued\":{worstQueued},\"maxSyncBuildBatchMs\":{F(tree.MaxBuildMs)},\"gcGen0\":{GC.CollectionCount(0) - gc0},\"gcGen1\":{GC.CollectionCount(1) - gc1},\"gcGen2\":{GC.CollectionCount(2) - gc2},\"patchesBuilt\":{tree.TotalBuilt - builtAt0},\"patchesReleased\":{tree.TotalReleased - releasedAt0},\"peakActivePatches\":{peakActive},\"peakQueued\":{peakQueued},\"peakMeshMB\":{F(peakMesh / 1048576.0)},\"finalMeshMB\":{F(tree.MeshBytes / 1048576.0)},\"finalActivePatches\":{tree.ActiveCount}}}");
             json.Append(",\n  \"memoryMBSamples\": [" + string.Join(",", memSamples.ConvertAll(x => (x / 1048576).ToString())) + "]");
+            // ---------- come back to the demo region: authored props must return, same ids, no duplicates
+            rig.FreeOrbit = false;
+            if (startOverride.HasValue) player.PlaceAt(startOverride.Value, V(boot.Anchor.North));
+            cam.transform.position = player.transform.position + player.Up * 5f; tree.Prewarm(cam.transform.position);
+            for (int f = 0; f < 120; f++) yield return null;
+            var idsBack = new List<string>(); if (boot.Props != null) foreach (var kv in boot.Props.Live) idsBack.Add(kv.Key); idsBack.Sort();
+            var markers = boot.Props != null ? boot.Props.GetComponentsInChildren<GF.Authoring.PlacedPropMarker>(true) : new GF.Authoring.PlacedPropMarker[0];
+            bool same = idsBack.Count == idsAtStart.Count && string.Join(",", idsBack) == string.Join(",", idsAtStart);
+            json.Append($",\n  \"authoredPropsAfterFlyoverReturn\": {{\"live\":{idsBack.Count},\"sameIdsAsBefore\":{(same ? "true" : "false")},\"markerObjects\":{markers.Length},\"duplicates\":{markers.Length - idsBack.Count},\"propsSpawnedTotal\":{boot.Props.TotalSpawned},\"propsDespawnedTotal\":{boot.Props.TotalDespawned}}}");
+            yield return Shot("40_demo_after_return");
             json.Append("\n}\n");
             File.WriteAllText(Path.Combine(dir, "planet_tests.json"), json.ToString());
             Application.Quit(0);

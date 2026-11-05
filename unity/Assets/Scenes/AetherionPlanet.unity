@@ -37,7 +37,7 @@ RenderSettings:
   m_ReflectionBounces: 1
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
-  m_Sun: {fileID: 454289115}
+  m_Sun: {fileID: 1949022388}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &454289114
+--- !u!1 &654820152
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,23 +127,158 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 454289117}
-  - component: {fileID: 454289115}
-  - component: {fileID: 454289116}
+  - component: {fileID: 654820155}
+  - component: {fileID: 654820154}
+  - component: {fileID: 654820153}
   m_Layer: 0
-  m_Name: Sun
+  m_Name: Planet
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &454289115
+--- !u!114 &654820153
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 654820152}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce4b15ee449fc39428cc43303188fc50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GF.Runtime::GF.Planet.SphereTestRunner
+--- !u!114 &654820154
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 654820152}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44f87e6feca21e24da51e9246f0514de, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GF.Runtime::GF.Planet.PlanetBootstrap
+  PlanetJson: {fileID: 4900000, guid: f7cadc01baae48247920c244ff6925a2, type: 3}
+  TerrainMat: {fileID: 2100000, guid: 235ec822927c4c547a6e528026b36ef4, type: 2}
+  WaterMat: {fileID: 2100000, guid: 1d41aab3bcea3e54db7e5034a3c6154a, type: 2}
+  SkyMat: {fileID: 2100000, guid: 34f02d16c336a084ba0e540f74e7847b, type: 2}
+  AstronautPrefab: {fileID: 463249436428555207, guid: 8bffe170ef219524ea17d21563cfffd6, type: 3}
+  GrassMat: {fileID: 2100000, guid: 43c797746eb0bc6408babc4389fa674e, type: 2}
+  PropPrefabs:
+  - {fileID: 3491346822244258657, guid: 8fcfd74e3f11e6d439e20419022314f4, type: 3}
+  - {fileID: 2713490514994299182, guid: bb76e09d92d4c7349a64b96dbf08c373, type: 3}
+  - {fileID: 1845274037266345590, guid: 179909cf5b764d54291bc1053355ff9e, type: 3}
+  - {fileID: 1767059936662566061, guid: f2133820382300245a7a4c9f11575622, type: 3}
+  - {fileID: 3926528992016696112, guid: 77e3d13b21814d648bc8116ce5925220, type: 3}
+  - {fileID: 2312833322748032997, guid: 68b2c29700a22f042a833c50798da280, type: 3}
+  PropKeys:
+  - Rock_namaqualand_boulder_02
+  - Rock_namaqualand_boulder_03
+  - Rock_namaqualand_boulder_05
+  - Rock_boulder_01
+  - Rock_namaqualand_cliff_01
+  - Rock_rock_07
+  UseAuthoredWorld: 1
+  EnableGrass: 1
+  Sun: {fileID: 1949022388}
+  SkyLight: {fileID: 1831647278}
+  PlanetRadius: 10000
+  AnchorDirection: {x: 0.62, y: 0.4, z: 0.67}
+  WorldSeed: 52841
+  Quality: 3
+  ShowDebugHud: 1
+--- !u!4 &654820155
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 654820152}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &978567834
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 978567836}
+  - component: {fileID: 978567835}
+  m_Layer: 0
+  m_Name: Global Volume
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &978567835
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 978567834}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
+  m_IsGlobal: 1
+  priority: 1
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 11400000, guid: 3145d5f9df6717c4690d18fbaf4c9dd9, type: 2}
+--- !u!4 &978567836
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 978567834}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1831647277
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1831647280}
+  - component: {fileID: 1831647278}
+  - component: {fileID: 1831647279}
+  m_Layer: 0
+  m_Name: Skylight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!108 &1831647278
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 454289114}
+  m_GameObject: {fileID: 1831647277}
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
@@ -202,13 +337,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!114 &454289116
+--- !u!114 &1831647279
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 454289114}
+  m_GameObject: {fileID: 1831647277}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
@@ -231,13 +366,13 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!4 &454289117
+--- !u!4 &1831647280
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 454289114}
+  m_GameObject: {fileID: 1831647277}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -246,7 +381,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &709405554
+--- !u!1 &1873863744
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -254,10 +389,10 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 709405558}
-  - component: {fileID: 709405557}
-  - component: {fileID: 709405556}
-  - component: {fileID: 709405555}
+  - component: {fileID: 1873863748}
+  - component: {fileID: 1873863747}
+  - component: {fileID: 1873863746}
+  - component: {fileID: 1873863745}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -265,13 +400,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &709405555
+--- !u!114 &1873863745
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 709405554}
+  m_GameObject: {fileID: 1873863744}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
@@ -309,21 +444,21 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!81 &709405556
+--- !u!81 &1873863746
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 709405554}
+  m_GameObject: {fileID: 1873863744}
   m_Enabled: 1
---- !u!20 &709405557
+--- !u!20 &1873863747
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 709405554}
+  m_GameObject: {fileID: 1873863744}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
@@ -368,13 +503,13 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &709405558
+--- !u!4 &1873863748
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 709405554}
+  m_GameObject: {fileID: 1873863744}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -383,7 +518,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1309119170
+--- !u!1 &1949022387
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -391,23 +526,23 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1309119173}
-  - component: {fileID: 1309119171}
-  - component: {fileID: 1309119172}
+  - component: {fileID: 1949022390}
+  - component: {fileID: 1949022388}
+  - component: {fileID: 1949022389}
   m_Layer: 0
-  m_Name: Skylight
+  m_Name: Sun
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &1309119171
+--- !u!108 &1949022388
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1309119170}
+  m_GameObject: {fileID: 1949022387}
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
@@ -466,13 +601,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!114 &1309119172
+--- !u!114 &1949022389
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1309119170}
+  m_GameObject: {fileID: 1949022387}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
@@ -495,148 +630,13 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!4 &1309119173
+--- !u!4 &1949022390
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1309119170}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1629916404
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1629916407}
-  - component: {fileID: 1629916406}
-  - component: {fileID: 1629916405}
-  m_Layer: 0
-  m_Name: Planet
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1629916405
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1629916404}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ce4b15ee449fc39428cc43303188fc50, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: GF.Runtime::GF.Planet.SphereTestRunner
---- !u!114 &1629916406
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1629916404}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 44f87e6feca21e24da51e9246f0514de, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: GF.Runtime::GF.Planet.PlanetBootstrap
-  PlanetJson: {fileID: 4900000, guid: f7cadc01baae48247920c244ff6925a2, type: 3}
-  TerrainMat: {fileID: 2100000, guid: 235ec822927c4c547a6e528026b36ef4, type: 2}
-  WaterMat: {fileID: 2100000, guid: 1d41aab3bcea3e54db7e5034a3c6154a, type: 2}
-  SkyMat: {fileID: 2100000, guid: 34f02d16c336a084ba0e540f74e7847b, type: 2}
-  AstronautPrefab: {fileID: 463249436428555207, guid: 8bffe170ef219524ea17d21563cfffd6, type: 3}
-  GrassMat: {fileID: 2100000, guid: 43c797746eb0bc6408babc4389fa674e, type: 2}
-  PropPrefabs:
-  - {fileID: 3491346822244258657, guid: 8fcfd74e3f11e6d439e20419022314f4, type: 3}
-  - {fileID: 2713490514994299182, guid: bb76e09d92d4c7349a64b96dbf08c373, type: 3}
-  - {fileID: 1845274037266345590, guid: 179909cf5b764d54291bc1053355ff9e, type: 3}
-  - {fileID: 1767059936662566061, guid: f2133820382300245a7a4c9f11575622, type: 3}
-  - {fileID: 3926528992016696112, guid: 77e3d13b21814d648bc8116ce5925220, type: 3}
-  - {fileID: 2312833322748032997, guid: 68b2c29700a22f042a833c50798da280, type: 3}
-  PropKeys:
-  - Rock_namaqualand_boulder_02
-  - Rock_namaqualand_boulder_03
-  - Rock_namaqualand_boulder_05
-  - Rock_boulder_01
-  - Rock_namaqualand_cliff_01
-  - Rock_rock_07
-  UseAuthoredWorld: 1
-  EnableGrass: 1
-  Sun: {fileID: 454289115}
-  SkyLight: {fileID: 1309119171}
-  PlanetRadius: 10000
-  AnchorDirection: {x: 0.62, y: 0.4, z: 0.67}
-  WorldSeed: 52841
-  Quality: 3
-  ShowDebugHud: 1
---- !u!4 &1629916407
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1629916404}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1948053209
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1948053211}
-  - component: {fileID: 1948053210}
-  m_Layer: 0
-  m_Name: Global Volume
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1948053210
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1948053209}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
-  m_IsGlobal: 1
-  priority: 1
-  blendDistance: 0
-  weight: 1
-  sharedProfile: {fileID: 11400000, guid: 3145d5f9df6717c4690d18fbaf4c9dd9, type: 2}
---- !u!4 &1948053211
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1948053209}
+  m_GameObject: {fileID: 1949022387}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -649,8 +649,8 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 454289117}
-  - {fileID: 1309119173}
-  - {fileID: 709405558}
-  - {fileID: 1948053211}
-  - {fileID: 1629916407}
+  - {fileID: 1949022390}
+  - {fileID: 1831647280}
+  - {fileID: 1873863748}
+  - {fileID: 978567836}
+  - {fileID: 654820155}

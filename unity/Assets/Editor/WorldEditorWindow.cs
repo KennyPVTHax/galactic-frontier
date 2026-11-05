@@ -38,13 +38,26 @@ namespace GF.EditorTools
         double nextOutline;
         Vec3d? hoverDir; double hoverH;
 
+        // ---- automation hooks (used by EditorTour to produce real screenshots; harmless otherwise)
+        internal Vec3d? AutoHover;
+        internal WorldEditorSession Session => S;
+        internal void AutoStart() { if (S == null) StartSession(); }
+        internal void AutoTab(int t) { tab = (Tab)t; }
+        internal void AutoGo(Vec3d d, double r) { GoTo(SceneView.lastActiveSceneView, d, r); }
+        internal void AutoGlobe() { GoToGlobe(SceneView.lastActiveSceneView); }
+        internal void AutoPatches(bool on) { showPatches = on; }
+        internal void AutoBrush(double radius, double strength, BrushKind sculpt, int layer, int veg) { brush.RadiusM = radius; brush.Strength = strength; sculptKind = sculpt; paintLayer = layer; vegMode = veg; eraseMat = false; }
+        internal void AutoSelectProp(string id) { selectedProp = id; }
+        internal void AutoRegion(int i) { selectedRegion = i; }
+        internal void AutoStatus(string s) { status = s; }
+
         static readonly string[] LayerNames = { "Grass", "Dirt", "Rock", "Sand" };
         static readonly Color[] LayerColors = { new Color(.35f, .65f, .25f), new Color(.55f, .38f, .22f), new Color(.6f, .6f, .62f), new Color(.85f, .78f, .52f) };
 
         [MenuItem("Tools/Galactic Frontier/World Editor")]
         public static void Open() { var w = GetWindow<WorldEditorWindow>("GF World Editor"); w.minSize = new Vector2(360, 520); w.Show(); }
 
-        void OnEnable() { SceneView.duringSceneGui += OnScene; }
+        void OnEnable() { titleContent = new GUIContent("GF World Editor"); SceneView.duringSceneGui += OnScene; }
         void OnDisable() { SceneView.duringSceneGui -= OnScene; if (S != null && S.World != null && S.World.Dirty && autoSave) S.Save(); CloseSession(); }
         void CloseSession() { if (S != null) { S.Close(); S = null; } }
 
@@ -242,7 +255,7 @@ namespace GF.EditorTools
             dir = dir.Normalized; double h = S.Field.Height(dir); double r = WorldEditorSession.PlanetRadius + h;
             Vector3 up = new Vector3((float)dir.x, (float)dir.y, (float)dir.z), pos = up * (float)r;
             Vector3 north = Vector3.Cross(Vector3.Cross(up, Vector3.up), up); if (north.sqrMagnitude < 0.01f) north = Vector3.forward; north.Normalize();
-            Quaternion rot = Quaternion.LookRotation(Quaternion.AngleAxis(-55f, Vector3.Cross(up, north)) * north * 1f, up);
+            Quaternion rot = Quaternion.LookRotation(Quaternion.AngleAxis(55f, Vector3.Cross(up, north)) * north, up);
             sv.cameraSettings.nearClip = 0.05f; sv.cameraSettings.farClip = 80000f; sv.cameraSettings.speed = 25f;
             sv.LookAt(pos, rot, (float)Math.Max(15, viewRadius), false, false);
             S.Tree.Prewarm(sv.camera.transform.position);
@@ -314,7 +327,7 @@ namespace GF.EditorTools
             if (S == null || !S.Valid) return;
             Event e = Event.current;
             Handles.BeginGUI();
-            GUILayout.BeginArea(new Rect(10, 10, 330, 54), EditorStyles.helpBox);
+            GUILayout.BeginArea(new Rect(sv.position.width * 0.5f - 165, 8, 330, 54), EditorStyles.helpBox);
             GUILayout.Label($"GF World Editor — {tab}" + (tab == Tab.Navigate ? "" : "  (left-drag to use)"), EditorStyles.boldLabel);
             GUILayout.Label(hoverDir.HasValue ? $"ground height {hoverH:F1} m" : "point at the planet", EditorStyles.miniLabel);
             GUILayout.EndArea();
@@ -338,7 +351,8 @@ namespace GF.EditorTools
             }
 
             Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-            bool hit = S.Raycast(ray, out var dir, out double height);
+            Vec3d dir; double height; bool hit;
+            if (AutoHover.HasValue) { dir = AutoHover.Value; height = S.Field.Height(dir); hit = true; } else hit = S.Raycast(ray, out dir, out height);
             hoverDir = hit ? dir : (Vec3d?)null; hoverH = height;
 
             // brush cursor

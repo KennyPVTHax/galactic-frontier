@@ -1,0 +1,21 @@
+PASS editor session opens with a live preview 
+PASS preview streams terrain around the chosen spot patches 693
+PASS edits recorded 17372 lattice points, 3 props, 1 regions, rev 384367, undo depth 10
+PASS rendered terrain shows the sculpt mesh 10010.44 vs analytic 10010.44, change +3.60 m
+PASS painted grass patch produces blades 2802 blades; cells live 146, built 194, total blades 87630, exclusion-test 0; veg at paint centre: excl 0.00 paintW 1.00 dens 0.88; h 10.88
+PASS exclusion zone has no vegetation 0 blades
+PASS 3 placed props spawned live 3
+PASS drawn surface is continuous across the cube-face edge and matches the edited terrain worst mesh-vs-analytic 0.121 m over 150 m, crossed 1x
+PASS undo of every step returns to the untouched planet 
+PASS redo restores every edit exactly 
+PASS world saved to disk 111 KB for 17372 points
+PASS closing the session releases every prop instance 
+PASS reopening restores every edit, prop and region exactly hash 2946FF944CD5C45C
+PASS terrain after reload is identical to before saving 10010.440 vs 10010.440
+PASS props return at the same ids and positions (moved rock stays moved) 
+PASS flying to the far side releases the edited region's props, grass and fine terrain live props 0, grass blades near the edit 0, patches 663
+PASS coming back restores the props with no duplicates markers 3, children 3
+PASS coming back restores the exact sculpted terrain 10010.440
+PASS grass paint and exclusion are identical after streaming back 
+PASS regenerating the procedural planet with a new seed keeps authored offsets and props max diff 1.8E-015 m
+PASS a regenerated world still loads every saved edit and renders it 

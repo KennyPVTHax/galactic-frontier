@@ -141,7 +141,7 @@ namespace GF.EditorTools
             var farViewer = P(new Vec3d(-spot.x, -spot.y, -spot.z), R + 60);
             s2.Tree.Prewarm(farViewer); s2.Props.Tick(farViewer); for (int i = 0; i < 10; i++) s2.Grass.Tick(farViewer, null);
             bool detailGone = !s2.Tree.ActiveIds.Any(id => id.level >= 8 && (id.CenterDirection() - spot).Length * R < 400);
-            Check(s2.Props.LiveCount == 0 && detailGone && s2.Grass.LiveCells == 0, "flying to the far side releases the edited region's props, grass and fine terrain", $"live props {s2.Props.LiveCount}, grass cells {s2.Grass.LiveCells}, patches {s2.Tree.ActiveCount}");
+            Check(s2.Props.LiveCount == 0 && detailGone && s2.Grass.CountBlades(spot, 400) == 0, "flying to the far side releases the edited region's props, grass and fine terrain", $"live props {s2.Props.LiveCount}, grass blades near the edit {s2.Grass.CountBlades(spot, 400)}, patches {s2.Tree.ActiveCount}");
             var near = P(spot, R + s2.Field.Height(spot) + 6);
             s2.Tree.Prewarm(near); s2.Props.Tick(near); for (int i = 0; i < 60; i++) s2.Grass.Tick(near, null);
             var ids3 = s2.Props.Live.Select(kv => kv.Key).OrderBy(x => x).ToList();

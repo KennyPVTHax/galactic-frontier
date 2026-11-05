@@ -1,0 +1,26 @@
+{
+  "gpu": "AMD Radeon RX 9070 XT",
+  "radiusM": 10000,
+  "authoredWorld": "34679 lattice points, 12 props, 1 regions, rev 0",
+  "astronautAnimator": "enabled=True controller=True speedParam=0.00 grounded=True clips=[Idle:1.00 ]",
+  "authoredPropsLiveAtStart": 12,
+  "authoredGrassCellsAtStart": 167,
+  "10_globe_anchor_patches": 654,
+  "11_globe_pole_patches": 24,
+  "12_globe_corner_patches": 24,
+  "13_globe_antipode_patches": 24,
+  "walks": [
+    {"name":"edge_+X_+Z","movedM":224.6091,"ticks":1323,"groundedTicks":1323,"facesVisited":2,"faceChanges":1,"maxFeetBelowRenderedMeshM":0.0372,"minFeetBelowRenderedMeshM":-0.0369,"minClearanceM":0,"maxClearanceM":0,"unstreamedSamples":0,"pass":true},
+    {"name":"corner_+X+Y+Z","movedM":187.5805,"ticks":1323,"groundedTicks":1323,"facesVisited":2,"faceChanges":1,"maxFeetBelowRenderedMeshM":0.0275,"minFeetBelowRenderedMeshM":-0.0398,"minClearanceM":0,"maxClearanceM":0,"unstreamedSamples":0,"pass":true},
+    {"name":"corner_-X-Y-Z","movedM":148.3058,"ticks":1323,"groundedTicks":1323,"facesVisited":2,"faceChanges":1,"maxFeetBelowRenderedMeshM":0.0284,"minFeetBelowRenderedMeshM":-0.0271,"minClearanceM":0,"maxClearanceM":0,"unstreamedSamples":0,"pass":true},
+    {"name":"north_pole","movedM":225.5639,"ticks":1323,"groundedTicks":1323,"facesVisited":1,"faceChanges":0,"maxFeetBelowRenderedMeshM":0.0317,"minFeetBelowRenderedMeshM":-0.0307,"minClearanceM":0,"maxClearanceM":0,"unstreamedSamples":0,"pass":true},
+    {"name":"south_pole","movedM":122.9137,"ticks":1323,"groundedTicks":1323,"facesVisited":1,"faceChanges":0,"maxFeetBelowRenderedMeshM":0.0273,"minFeetBelowRenderedMeshM":-0.0291,"minClearanceM":0,"maxClearanceM":0,"unstreamedSamples":0,"pass":true},
+    {"name":"authored_region_across_face_edge","movedM":171.2995,"ticks":1323,"groundedTicks":1323,"facesVisited":1,"faceChanges":0,"maxFeetBelowRenderedMeshM":0.045,"minFeetBelowRenderedMeshM":-0.4498,"minClearanceM":0,"maxClearanceM":0,"unstreamedSamples":0,"pass":true},
+    {"name":"antipode","movedM":224.9208,"ticks":1323,"groundedTicks":1323,"facesVisited":1,"faceChanges":0,"maxFeetBelowRenderedMeshM":0.0344,"minFeetBelowRenderedMeshM":-0.0283,"minClearanceM":0,"maxClearanceM":0,"unstreamedSamples":0,"pass":true}
+  ],
+  "walksPassed": 7,
+  "walksTotal": 7,
+  "flyover": {"speedMps":250,"travelledM":6000.0245,"frames":5716,"avgMs":4.2082,"p99Ms":13.6734,"maxMs":103.9236,"worstFrameMs":103.9236,"worstFrameAtS":0.05,"worstFrameQueued":5,"maxSyncBuildBatchMs":1267.7935,"gcGen0":1323,"gcGen1":1323,"gcGen2":1323,"patchesBuilt":6303,"patchesReleased":6300,"peakActivePatches":1278,"peakQueued":636,"peakMeshMB":54.4363,"finalMeshMB":29.5183,"finalActivePatches":693},
+  "memoryMBSamples": [195,194,195,195,195,195,195,195,195,195,195,196,196,195,195,195,195,196,196,194,194,193,193,193,193,194,194,194,194,194,194,194,194,194,194,195,195,195,195,195,195,196,195,196,196,196,196,197,196,196,197,196,196,197,197,196,196,196,197,197,197,197,197,196,196,197,197,197,197,197,197,197,197,197,198,197,197,198,198,198,197,198,198,198,198,198,198,198,197,197,198,198,198,198,198],
+  "authoredPropsAfterFlyoverReturn": {"live":12,"sameIdsAsBefore":true,"markerObjects":12,"duplicates":0,"propsSpawnedTotal":48,"propsDespawnedTotal":36}
+}

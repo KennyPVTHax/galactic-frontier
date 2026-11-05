@@ -98,7 +98,7 @@ namespace GF.EditorTools
             {
                 Grass = new GameObject("Grass") { hideFlags = HideFlags.HideAndDontSave }.AddComponent<SphereGrass>();
                 Grass.transform.SetParent(Root.transform);
-                Grass.Field = Field; Grass.World = World; Grass.Radius = PlanetRadius; Grass.Mat = grassMat; Grass.WaterLevel = Planet.liquid.level; Grass.DrawRadius = 70f; Grass.BladesPerSquareMetre = 9f;
+                Grass.Field = Field; Grass.World = World; Grass.Radius = PlanetRadius; Grass.Mat = grassMat; Grass.WaterLevel = Planet.liquid.level; Grass.DrawRadius = 70f; Grass.BladesPerSquareMetre = 9f; Grass.MaxViewerAltitude = 90f;
             }
 
             if (waterMat != null)

@@ -79,16 +79,16 @@ namespace GF.Authoring
             w0 = w1 = w2 = w3 = 0; ovr = 0;
             if (Cells.Count == 0) return;
             Corners(dir, out int f, out int i, out int j, out double tx, out double ty);
-            var c = new[] { Get(f, i, j), Get(f, i + 1, j), Get(f, i, j + 1), Get(f, i + 1, j + 1) };
-            double[] wt = { (1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty };
-            double a0 = 0, a1 = 0, a2 = 0, a3 = 0, o = 0;
-            for (int k = 0; k < 4; k++)
-            {
-                double ow = c[k].ovr / 255.0 * wt[k];
-                o += ow;
-                a0 += (c[k].mat & 255) * ow; a1 += ((c[k].mat >> 8) & 255) * ow; a2 += ((c[k].mat >> 16) & 255) * ow; a3 += ((c[k].mat >> 24) & 255) * ow;
-            }
+            Cell c00 = Get(f, i, j), c10 = Get(f, i + 1, j), c01 = Get(f, i, j + 1), c11 = Get(f, i + 1, j + 1);
+            if (c00.ovr == 0 && c10.ovr == 0 && c01.ovr == 0 && c11.ovr == 0) return;
+            double wa = (1 - tx) * (1 - ty), wb = tx * (1 - ty), wc = (1 - tx) * ty, wd = tx * ty;
+            double oa = c00.ovr / 255.0 * wa, ob = c10.ovr / 255.0 * wb, oc = c01.ovr / 255.0 * wc, od = c11.ovr / 255.0 * wd;
+            double o = oa + ob + oc + od;
             if (o <= 1e-6) return;
+            double a0 = (c00.mat & 255) * oa + (c10.mat & 255) * ob + (c01.mat & 255) * oc + (c11.mat & 255) * od;
+            double a1 = ((c00.mat >> 8) & 255) * oa + ((c10.mat >> 8) & 255) * ob + ((c01.mat >> 8) & 255) * oc + ((c11.mat >> 8) & 255) * od;
+            double a2 = ((c00.mat >> 16) & 255) * oa + ((c10.mat >> 16) & 255) * ob + ((c01.mat >> 16) & 255) * oc + ((c11.mat >> 16) & 255) * od;
+            double a3 = ((c00.mat >> 24) & 255) * oa + ((c10.mat >> 24) & 255) * ob + ((c01.mat >> 24) & 255) * oc + ((c11.mat >> 24) & 255) * od;
             ovr = (float)o;
             w0 = (byte)Math.Min(255, a0 / o); w1 = (byte)Math.Min(255, a1 / o); w2 = (byte)Math.Min(255, a2 / o); w3 = (byte)Math.Min(255, a3 / o);
         }
@@ -99,14 +99,13 @@ namespace GF.Authoring
             excl = paintW = paintDensity = 0;
             if (Cells.Count == 0) return;
             Corners(dir, out int f, out int i, out int j, out double tx, out double ty);
-            double[] wt = { (1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty };
-            var c = new[] { Get(f, i, j), Get(f, i + 1, j), Get(f, i, j + 1), Get(f, i + 1, j + 1) };
-            double dsum = 0;
-            for (int k = 0; k < 4; k++)
-            {
-                if (c[k].vegMode == 2) excl += wt[k];
-                else if (c[k].vegMode == 1) { paintW += wt[k]; dsum += wt[k] * c[k].veg / 255.0; }
-            }
+            Cell c00 = Get(f, i, j), c10 = Get(f, i + 1, j), c01 = Get(f, i, j + 1), c11 = Get(f, i + 1, j + 1);
+            if (c00.vegMode == 0 && c10.vegMode == 0 && c01.vegMode == 0 && c11.vegMode == 0) return;
+            double wa = (1 - tx) * (1 - ty), wb = tx * (1 - ty), wc = (1 - tx) * ty, wd = tx * ty, dsum = 0;
+            if (c00.vegMode == 2) excl += wa; else if (c00.vegMode == 1) { paintW += wa; dsum += wa * c00.veg / 255.0; }
+            if (c10.vegMode == 2) excl += wb; else if (c10.vegMode == 1) { paintW += wb; dsum += wb * c10.veg / 255.0; }
+            if (c01.vegMode == 2) excl += wc; else if (c01.vegMode == 1) { paintW += wc; dsum += wc * c01.veg / 255.0; }
+            if (c11.vegMode == 2) excl += wd; else if (c11.vegMode == 1) { paintW += wd; dsum += wd * c11.veg / 255.0; }
             paintDensity = paintW > 1e-6 ? dsum / paintW : 0;
         }
 

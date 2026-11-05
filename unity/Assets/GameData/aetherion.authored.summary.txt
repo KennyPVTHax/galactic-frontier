@@ -1,0 +1,16 @@
+Galactic Frontier authored world (human-readable summary; the real data is Assets/Resources/Authored/aetherion.gfworld.bytes)
+planet=aetherion format=1 baseSeed=52841 lattice=32768
+lattice points: 34679   props: 12   regions: 1   hash: 0911ECA63C9ADC6B
+region r1 'Demo Meadow' dir=(0.617638,0.406375,0.673337) radius=90 m
+prop dc1b2b339921 Rock_namaqualand_cliff_01 dir=(0.619226,0.408661,0.670489) yaw=200.0 scale=1.40 LANDMARK
+prop f846c4dce81b Rock_namaqualand_boulder_03 dir=(0.618576,0.407656,0.671700) yaw=40.0 scale=1.50
+prop 42bb4d34bf24 Rock_namaqualand_boulder_02 dir=(0.619807,0.407474,0.670675) yaw=120.0 scale=1.90
+prop 01fe91e9a33c Rock_namaqualand_boulder_03 dir=(0.617802,0.408751,0.671747) yaw=300.0 scale=1.10
+prop 809205bb4284 Rock_namaqualand_boulder_02 dir=(0.619748,0.409118,0.669728) yaw=75.0 scale=1.30
+prop 71f699d4117e Rock_rock_07 dir=(0.615586,0.405838,0.675536) yaw=0.0 scale=2.20
+prop 3830bc80736d Rock_rock_07 dir=(0.616279,0.406235,0.674666) yaw=53.0 scale=2.70
+prop 78394320a80a Rock_rock_07 dir=(0.616748,0.406391,0.674142) yaw=106.0 scale=3.20
+prop eef06ff88488 Rock_rock_07 dir=(0.617613,0.406215,0.673457) yaw=159.0 scale=2.20
+prop 2c341e148324 Rock_rock_07 dir=(0.618249,0.405814,0.673114) yaw=212.0 scale=2.70
+prop ca07e3ae4ae9 Rock_rock_07 dir=(0.619174,0.405432,0.672494) yaw=265.0 scale=3.20
+prop 43b735a81571 Rock_rock_07 dir=(0.619728,0.405301,0.672062) yaw=318.0 scale=2.20
