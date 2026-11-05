@@ -54,3 +54,6 @@ import "@babylonjs/core/PostProcesses/RenderPipeline/postProcessRenderPipelineMa
 import "@babylonjs/core/Materials/Textures/baseTexture.polynomial";
 import "@babylonjs/core/Rendering/depthRendererSceneComponent";
 import "@babylonjs/core/Engines/Extensions/engine.query";
+
+// M5 combat (append-only): procedural particle textures that also work under NullEngine.
+export { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
