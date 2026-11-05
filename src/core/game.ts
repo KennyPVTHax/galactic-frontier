@@ -48,6 +48,13 @@ import { WarpFx } from "../graphics/warpFx";
 import { SpaceEnvironment } from "../world/space";
 import { PAINT_SCHEMES } from "../vehicles/shipModel";
 import { upgradeSum } from "./gameHelpers";
+import { PerfRecorder, type PerfContext, type PerfReport } from "./perfRecorder";
+import { PerfOverlay } from "../ui/perfOverlay";
+import { CLIENT_VERSION } from "../integration/backend";
+import { installDebugHooks } from "./debugHooks";
+
+/** Set by the build: release bundles define __GF_DEBUG__ = false so the test hooks are dropped entirely. */
+declare const __GF_DEBUG__: boolean | undefined;
 
 export type GameOutEvent =
   | { type: "ready"; quality: QualityLevel; tier: GraphicsTier }
@@ -72,6 +79,8 @@ export interface GameOptions {
   forceTouch?: boolean;
   /** Exposes window.__GF debug helpers (never enable in production). */
   debug?: boolean;
+  /** Show the performance recorder (the same overlay is toggled by Settings → Performance stats). */
+  perfOverlay?: boolean;
   /** Skip the title screen. */
   autoStart?: "new" | "continue";
   /** Called when a settings change needs a full restart (quality). */
@@ -169,6 +178,12 @@ export class Game {
   private space: SpaceEnvironment | null = null;
   private combatStats = { shots: 0, hits: 0, kills: 0 };
   private lastHullRatio = 1;
+  // ---- real-device performance recorder (M7)
+  private readonly perfRec = new PerfRecorder();
+  private perfUi!: PerfOverlay;
+  private perfReport: PerfReport | null = null;
+  private perfSampleMs = 0;
+  private perfLiveMs = 0;
   private particleTex: ReturnType<typeof makeParticleTexture> | null = null;
   private frontierTab: "contracts" | "pilot" = "contracts";
 
@@ -193,6 +208,7 @@ export class Game {
 
     this.platform = detectPlatform();
     this.prefs = loadDevicePrefs();
+    if (opts.perfOverlay) this.prefs.perfStats = true;
     this.engine = new Engine(
       this.canvas,
       true,
@@ -301,6 +317,17 @@ export class Game {
     this.shipFx = new ShipFx(this.scene, ptex, this.shipModel.nozzles);
     this.combat = new CombatSystem({ seed: (Date.now() ^ 0x5bd1e995) & 0x7fffffff });
     this.combatRenderer = new CombatRenderer(this.scene, { pbr: profile.pbr, detail: profile.tier === "basic" ? 0 : profile.tier === "enhanced" ? 1 : 2, lights: profile.tier === "basic" ? 0 : 1, budget: profile.combatFx });
+    this.perfUi = new PerfOverlay(this.hud.root, {
+      onStart: () => {
+        this.perfRec.start();
+        this.perfReport = null;
+        this.perfSampleMs = 0;
+        this.perfUi.setRecording(true);
+        this.hud.toast("Recording performance — play normally for at least 60 s, then tap Stop", "info");
+      },
+      onStop: () => this.finishPerfRecording(),
+      getReportJson: () => (this.perfReport ? JSON.stringify(this.perfReport, null, 1) : null),
+    });
     this.combatHud = new CombatHud(this.hud.root);
     this.combatHud.setTouch(this.input.touchActive);
     this.warpFx = new WarpFx(this.scene, this.rig.camera, profile.warpFx.streaks);
@@ -363,7 +390,8 @@ export class Game {
     this.hud.root.classList.add("title");
     this.emit({ type: "ready", quality: this.qualityLevel, tier: this.tierDecision.tier });
     this.orientation.refresh();
-    if (this.opts.debug) this.exposeDebug();
+    // The define is used inline (not via a const) so the bundler folds the branch away in release builds.
+    if ((typeof __GF_DEBUG__ === "undefined" || __GF_DEBUG__) && this.opts.debug) installDebugHooks(this);
 
     if (this.opts.autoStart) {
       await this.start(this.opts.autoStart === "continue" && save ? save : null);
@@ -569,6 +597,7 @@ export class Game {
 
   private frame(): void {
     if (this.disposed) return;
+    if (this.perfRec.isRecording) this.perfFrame(this.engine.getDeltaTime());
     const raw = this.engine.getDeltaTime() / 1000;
     const dt = Math.min(0.05 * this.timeScale, Math.max(0, raw) * this.timeScale) || 0.016;
     try {
@@ -1178,6 +1207,9 @@ export class Game {
       this.hud.setShip(s.speed, alt, s.throttle, s.hull / s.maxHull, status);
     }
     this.hud.setResources(this.inventory.snapshot(), this.inventory.capacity);
+    this.perfUi.setVisible(this.prefs.perfStats && this.mode !== "title");
+    if (this.perfRec.isRecording) this.perfUi.setLive(`${Math.round(this.engine.getFps())} fps · ${Math.round(this.perfRec.seconds)}s`);
+    else if (this.prefs.perfStats) this.perfUi.setLive(`${Math.round(this.engine.getFps())} fps`);
     if (this.prefs.perfStats) {
       const st = this.renderer.stats();
       this.hud.setPerf([
@@ -1245,6 +1277,68 @@ export class Game {
     if (step === "dock" && this.mode === "onFoot") return { pos: new Vector3(this.ship.x, this.ship.y + 3, this.ship.z), label: WORLD.shipName };
     if ((step === "scan" || step === "mine") && this.mode === "ship" && this.ship.state === "flying") return { pos: new Vector3(site.x, this.planet.groundAt(site.x, site.z) + 4, site.z), label: site.name };
     return null;
+  }
+
+  // ------------------------------------------------------------------ performance recorder (M7)
+
+  private perfFrame(ms: number): void {
+    if (!this.perfRec.frame(ms)) {
+      this.finishPerfRecording();
+      return;
+    }
+    this.perfSampleMs += ms;
+    if (this.perfSampleMs >= 1000) {
+      this.perfSampleMs = 0;
+      const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+      let thermal: number | null = null;
+      try {
+        const t = this.platform.android?.thermalStatus?.();
+        if (typeof t === "number" && t >= 0) thermal = t;
+      } catch {
+        /* host without thermal API */
+      }
+      this.perfRec.sample({ heapMB: mem ? mem.usedJSHeapSize / 1048576 : null, renderScale: this.renderer.governor.scale, thermal });
+    }
+  }
+
+  private finishPerfRecording(): void {
+    if (!this.perfRec.isRecording && this.perfRec.frameCount === 0) return;
+    this.perfRec.stop();
+    this.perfUi.setRecording(false);
+    this.perfReport = this.perfRec.report(this.perfContext());
+    this.perfUi.showResult(this.perfReport);
+  }
+
+  private perfContext(): PerfContext {
+    const st = this.renderer.stats();
+    let nativeDevice: unknown;
+    try {
+      const raw = this.platform.android?.deviceInfo?.();
+      if (raw) nativeDevice = JSON.parse(raw);
+    } catch {
+      nativeDevice = undefined;
+    }
+    const hostiles = this.combat.hostileCount;
+    const activity = this.mode === "onFoot" ? "on foot" : this.ship.state === "flying" ? (hostiles > 0 ? `combat (${hostiles} hostile)` : "flight") : `ship ${this.ship.state}`;
+    return {
+      appVersion: CLIENT_VERSION,
+      platform: this.platform.kind,
+      tier: this.tierDecision.tier,
+      tierReason: this.tierDecision.reason,
+      adaptiveResolution: this.prefs.adaptive,
+      resolutionPreference: this.prefs.resolution,
+      devicePixelRatio: window.devicePixelRatio || 1,
+      canvas: { width: this.engine.getRenderWidth(), height: this.engine.getRenderHeight() },
+      gl: { renderer: this.caps.renderer, webgl2: this.caps.webgl2, maxTextureSize: this.caps.maxTextureSize },
+      userAgent: navigator.userAgent,
+      deviceMemoryGb: this.caps.deviceMemoryGb,
+      cores: this.caps.cores,
+      screen: { width: screen.width, height: screen.height },
+      nativeDevice,
+      planet: this.planetDef.name,
+      scene: { meshes: this.scene.meshes.length, activeMeshes: st.activeMeshes, drawCalls: st.drawCalls, trianglesK: Math.round(st.triangles / 1000) },
+      activity,
+    };
   }
 
   // ------------------------------------------------------------------ universe (M4)
@@ -1611,16 +1705,6 @@ export class Game {
     this.combat.spawnArrival(table, { x: s.x, y: s.y, z: s.z }, this.planetDef.danger, upgradeSum(this.levels));
   }
 
-  /** Instant warp for tests and debugging (same code path minus the effect timing). */
-  warpNow(id: PlanetId): void {
-    const from = this.planetId;
-    if (this.mode === "onFoot") this.enterShip(false);
-    this.warp = null;
-    this.hud.setWarp(null);
-    this.arriveAt(id);
-    this.onArrived(from);
-  }
-
   private updateSuit(dt: number, sheltered: boolean): void {
     const def = this.planetDef;
     if (def.hazard.kind === "none") {
@@ -1806,103 +1890,13 @@ export class Game {
 
   // ------------------------------------------------------------------ debug & dispose
 
-  private exposeDebug(): void {
-    const g = this;
-    (window as any).__GF = {
-      game: g,
-      state: () => ({
-        mode: g.mode,
-        ship: { state: g.ship.state, x: g.ship.x, y: g.ship.y, z: g.ship.z, speed: g.ship.speed, hull: g.ship.hull, agl: g.ship.agl(g.shipEnv) },
-        player: { x: g.player.position.x, y: g.player.position.y, z: g.player.position.z, grounded: g.player.grounded, jetFuel: g.player.jetFuel },
-        inventory: g.inventory.snapshot(),
-        laser: { energy: g.laser.energy, heat: g.laser.heat, overheated: g.laser.overheated },
-        mission: g.mission.state,
-        quality: g.qualityLevel,
-        tier: g.tierDecision.tier,
-        tierReason: g.tierDecision.reason,
-        platform: g.platform.kind,
-        orientation: g.orientationState,
-        perf: g.renderer.stats(),
-        world: g.planet.stats(),
-        panel: g.hud.panel,
-        tagged: g.tagged.size,
-        target: g.currentTarget?.id ?? null,
-        planet: g.planetId,
-        combat: {
-          enemies: g.combat.enemies().filter((e) => e.alive).map((e) => ({ id: e.id, type: e.type, name: ENEMY_TYPES[e.type].name, state: e.state, x: e.pos.x, y: e.pos.y, z: e.pos.z })),
-          shield: g.combat.playerShield,
-          maxShield: g.combat.playerMaxShield,
-          heat: g.combat.playerHeat,
-          shotsFired: g.combatStats.shots,
-          hitsLanded: g.combatStats.hits,
-          kills: g.combatStats.kills,
-          projectiles: g.combat.projectiles().length,
-        },
-        warping: g.warp ? g.warp.phase : null,
-        contract: g.contracts.summary(),
-        contractsCompleted: [...g.contracts.state.completed],
-        xp: g.progression.state.xp,
-        achievements: [...g.progression.state.achievements],
-        suit: g.suit.integrity,
-        fps: g.engine.getFps(),
-        drawCalls: (g.engine as any)._drawCalls?.current ?? null,
-        activeMeshes: g.scene.getActiveMeshes().length,
-      }),
-      teleportShip: (x: number, y: number, z: number, yaw = g.ship.yaw) => Object.assign(g.ship, { x, y, z, yaw, speed: 0, throttle: 0, pitch: 0 }),
-      teleportPlayer: (x: number, z: number) => g.player.place(x, z, g.planet, g.player.facing),
-      give: (id: ResourceId, n: number) => {
-        const got = g.inventory.add(id, n);
-        g.missionEvent({ type: "collected", resource: id, amount: got });
-        return got;
-      },
-      /** Stand next to the nearest deposit of a type and aim the camera at it. */
-      approach: (type: ResourceId) => {
-        const p = g.player.position;
-        const list = g.planet.deposits.filter((d) => d.type === type && d.amount > 0).sort((a, b) => Vector3.Distance(a.position, p) - Vector3.Distance(b.position, p));
-        const d = list[0];
-        if (!d) return null;
-        const away = p.subtract(d.position);
-        away.y = 0;
-        away.normalize().scaleInPlace(d.radius + 3.5);
-        g.player.place(d.position.x + away.x, d.position.z + away.z, g.planet, 0);
-        const to = d.position.subtract(g.player.position.add(new Vector3(0, 1.65, 0)));
-        g.rig.yaw = Math.atan2(to.x, to.z);
-        g.rig.pitch = clamp(-Math.atan2(to.y, Math.hypot(to.x, to.z)) + 0.12, -0.5, 1.1);
-        return d.id;
-      },
-      setTimeScale: (s: number) => (g.timeScale = s),
-      setTier: (t: GraphicsTier | "auto") => {
-        g.prefs.graphics = t;
-        g.applyGraphics();
-        return g.tierDecision.tier;
-      },
-      setAdaptive: (on: boolean) => {
-        g.prefs.adaptive = on;
-        g.renderer.governor.enabled = on;
-      },
-      save: () => g.save(),
-      warpNow: (id: PlanetId) => g.warpNow(id),
-      /** Test helper: point the Wayfarer's nose at the locked/nearest hostile (mouse aiming is impractical at 2 fps). */
-      aimAtTarget: () => {
-        const tgt = g.combat.target();
-        const e = tgt?.enemy ?? g.combat.enemies().find((x) => x.alive);
-        if (!e) return false;
-        const dx = e.pos.x - g.ship.x, dy = e.pos.y - g.ship.y, dz = e.pos.z - g.ship.z;
-        g.ship.yaw = Math.atan2(dx, dz);
-        g.ship.pitch = Math.atan2(dy, Math.hypot(dx, dz));
-        return true;
-      },
-      spawnEncounter: (id: string) => g.spawnContractEncounter(id),
-      startWarp: (id: PlanetId) => g.startWarp(id),
-    };
-  }
-
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     for (const c of this.cleanup) c();
     this.input.dispose();
     this.orientation.dispose();
+    this.perfUi?.dispose();
     this.combatHud?.dispose();
     this.combatRenderer?.dispose();
     this.warpFx?.dispose();
@@ -1915,7 +1909,7 @@ export class Game {
     this.hud.dispose();
     this.canvas.remove();
     this.opts.container.classList.remove("gf-root");
-    if (this.opts.debug) delete (window as any).__GF;
+    if ((typeof __GF_DEBUG__ === "undefined" || __GF_DEBUG__) && this.opts.debug) delete (window as any).__GF;
   }
 }
 

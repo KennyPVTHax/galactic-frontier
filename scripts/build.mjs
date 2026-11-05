@@ -3,6 +3,11 @@
 //   node scripts/build.mjs lib      -> dist/lib/galactic-frontier.js  (ESM module for the React host)
 //   node scripts/build.mjs preview  -> dist/preview/index.html        (single self-contained playable file)
 //   node scripts/build.mjs serve    -> dev server on http://localhost:5173
+//   node scripts/build.mjs release  -> dist/web/index.html  (single playable file, test hooks compiled out)
+//   node scripts/build.mjs android  -> android/app/src/main/assets/www/index.html (same release bundle for the WebView app)
+//
+// `lib`, `preview` and `serve` keep the window.__GF test hooks (used by the browser tests). `release` and
+// `android` define __GF_DEBUG__=false so src/core/debugHooks.ts is dropped from the bundle.
 //
 // Babylon.js is resolved from node_modules/@babylonjs/core as normal. For offline builds
 // against a Babylon source checkout, set BABYLON_CORE_SRC=/path/to/Babylon.js/packages/dev/core/src
@@ -37,6 +42,7 @@ if (babylonSrc && !existsSync(join(root, "node_modules/@babylonjs/core"))) {
 }
 
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const releaseMode = mode === "release" || mode === "android";
 const common = {
   bundle: true,
   format: "esm",
@@ -44,6 +50,7 @@ const common = {
   alias,
   define: {
     __GF_VERSION__: JSON.stringify(pkg.version),
+    __GF_DEBUG__: releaseMode ? "false" : "true",
   },
   logLevel: "info",
   legalComments: "none",
@@ -72,8 +79,12 @@ async function buildPreviewBundle(minify = true) {
   return { js: result.outputFiles[0].text, meta: result.metafile };
 }
 
-function htmlShell(inlineJs) {
-  const tpl = readFileSync(join(root, "index.html"), "utf8");
+// Release pages get a strict CSP: only the inline bundle runs, nothing can be fetched from the network.
+const RELEASE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src data: blob:; worker-src blob:; base-uri 'none'; form-action 'none'";
+
+function htmlShell(inlineJs, release = false) {
+  let tpl = readFileSync(join(root, "index.html"), "utf8");
+  if (release) tpl = tpl.replace("<head>", `<head>\n    <meta http-equiv="Content-Security-Policy" content="${RELEASE_CSP}" />`);
   // Avoid closing the inline <script> early.
   const safe = inlineJs.replace(/<\/script/gi, "<\\/script");
   return tpl.replace('<script type="module" src="/src/main.ts"></script>', () => `<script>${safe}</script>`);
@@ -114,7 +125,16 @@ async function serve() {
   console.log(`[dev] http://localhost:${port}`);
 }
 
-if (mode === "lib") await buildLib();
+async function buildRelease(outFile) {
+  const { js } = await buildPreviewBundle(true);
+  mkdirSync(dirname(outFile), { recursive: true });
+  writeFileSync(outFile, htmlShell(js, true));
+  console.log(`[build] ${mode} -> ${outFile} (${(Buffer.byteLength(js) / 1024).toFixed(0)} KB JS inlined, debug hooks: off)`);
+}
+
+if (mode === "release") await buildRelease(join(root, "dist/web/index.html"));
+else if (mode === "android") await buildRelease(join(root, "android/app/src/main/assets/www/index.html"));
+else if (mode === "lib") await buildLib();
 else if (mode === "preview") await buildPreview();
 else if (mode === "serve") await serve();
 else throw new Error(`Unknown mode ${mode}`);

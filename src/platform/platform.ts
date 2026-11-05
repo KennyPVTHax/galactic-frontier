@@ -38,6 +38,12 @@ export interface AndroidGameBridge {
   setLandscape?(on: boolean): void;
   haptic?(ms: number): void;
   exitGame?(): void;
+  /** Device facts as JSON (model, SoC, WebView version, RAM, refresh rate) for performance reports. */
+  deviceInfo?(): string;
+  /** Android thermal status 0 (none) … 6 (shutdown). */
+  thermalStatus?(): number;
+  shareReport?(text: string): void;
+  saveReport?(text: string): string;
 }
 
 export interface Insets {

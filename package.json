@@ -29,7 +29,9 @@
     "test:m2": "node scripts/m2-validate.cjs",
     "compare": "node scripts/m2-compare.cjs",
     "test:journey": "node scripts/journey-test.cjs",
-    "bench": "node scripts/benchmark.cjs"
+    "bench": "node scripts/benchmark.cjs",
+    "build:release": "node scripts/build.mjs release",
+    "build:android-assets": "node scripts/build.mjs android"
   },
   "dependencies": {
     "@babylonjs/core": "^9.33.2"

@@ -5,3 +5,11 @@ test-results/
 *.log
 m2-results/
 .claude/worktrees/
+
+# generated Android assets / build output
+android/app/src/main/assets/www/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk

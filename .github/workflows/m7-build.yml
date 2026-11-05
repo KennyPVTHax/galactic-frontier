@@ -1,0 +1,136 @@
+name: M7 build (web preview + Android debug APK)
+
+# Builds downloadable test artifacts. Nothing is deployed anywhere and nothing is published to a store.
+on:
+  workflow_dispatch:
+    inputs:
+      full_e2e:
+        description: "Also run the journey on Enhanced and Extreme HD (slow, software rendering)"
+        type: boolean
+        default: false
+  pull_request:
+  push:
+    branches: [claude/galactic-frontier-m2-m6-jaqnfn]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m7-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks-and-web:
+    name: Typecheck, unit tests, web preview
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build release web preview (test hooks compiled out)
+        run: |
+          npm run build:release
+          sha256sum dist/web/index.html | tee dist/web/index.html.sha256
+          cp docs/PHONE-TESTING.md dist/web/PHONE-TESTING.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: galactic-frontier-web-preview
+          path: dist/web/
+          if-no-files-found: error
+
+  android-apk:
+    name: Android debug APK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci --ignore-scripts
+      - name: Bundle the game into the app (release build, test hooks compiled out)
+        run: npm run build:android-assets
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleDebug
+      - name: Verify the APK (no network permission, no test hooks, bundled game present)
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          AAPT2="$ANDROID_HOME/build-tools/34.0.0/aapt2"
+          "$AAPT2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdk|uses-permission"
+          if "$AAPT2" dump permissions "$APK" | grep -q "android.permission.INTERNET"; then echo "INTERNET permission present"; exit 1; fi
+          unzip -p "$APK" assets/www/index.html > /tmp/game.html
+          test -s /tmp/game.html
+          if grep -q "window.__GF" /tmp/game.html; then echo "test hooks found in bundled game"; exit 1; fi
+          mkdir -p out
+          cp "$APK" out/galactic-frontier-m7-debug.apk
+          (cd out && sha256sum galactic-frontier-m7-debug.apk | tee galactic-frontier-m7-debug.apk.sha256)
+          cp docs/PHONE-TESTING.md out/PHONE-TESTING.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: galactic-frontier-android-debug-apk
+          path: out/
+          if-no-files-found: error
+
+  journey-basic:
+    name: Browser journey (basic)
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Play the required journey
+        run: node scripts/journey-test.cjs test-results/journey basic
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-basic
+          path: test-results/journey/
+
+  # Heavier tiers: software rendering makes these slow, so they run on request (workflow_dispatch full_e2e).
+  journey-heavy:
+    name: Browser journey (${{ matrix.tier }})
+    needs: checks-and-web
+    if: ${{ github.event.inputs.full_e2e == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        tier: [enhanced, ultra]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Play the required journey
+        run: node scripts/journey-test.cjs test-results/journey ${{ matrix.tier }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-${{ matrix.tier }}
+          path: test-results/journey/
