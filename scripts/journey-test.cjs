@@ -32,19 +32,32 @@ function check(step, name, ok, detail = "") {
 const st = (p) => p.evaluate(() => window.__GF.state());
 // Software rendering is far slower on the heavier tiers (<1 fps on Extreme HD), so every wait scales with the tier.
 const SLOW = { basic: 1, enhanced: 2.5, ultra: 5 }[QUALITY] || 1;
+// GF_MODELS_DIR=<dir with manifest.json>: serve the shipped hero models to the game (as the APK would), so the journey runs with the authored astronaut.
+const MODELS_BASE = "https://gf-models.test/models/";
+const MODELS_Q = process.env.GF_MODELS_DIR ? `&models=${encodeURIComponent(MODELS_BASE)}` : "";
+async function serveModels(ctx) {
+  if (!process.env.GF_MODELS_DIR) return;
+  const dir = path.resolve(process.env.GF_MODELS_DIR);
+  await ctx.route(MODELS_BASE + "**", (r) => {
+    const f = path.join(dir, decodeURIComponent(r.request().url().slice(MODELS_BASE.length)));
+    if (!f.startsWith(dir) || !fs.existsSync(f)) return r.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
+    r.fulfill({ status: 200, headers: { "access-control-allow-origin": "*", "content-type": f.endsWith(".glb") ? "model/gltf-binary" : "application/json" }, body: fs.readFileSync(f) });
+  });
+}
 const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { timeout: timeout * SLOW, polling: 100 });
 
 (async () => {
   const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   ctx.setDefaultTimeout(120000 * SLOW);
+  await serveModels(ctx);
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   const shot = (n) => page.screenshot({ path: path.join(OUT, n) }).catch(() => undefined);
 
-  await page.goto(`${URL}?debug=1&quality=${QUALITY}&slot=journey`);
+  await page.goto(`${URL}?debug=1&quality=${QUALITY}&slot=journey${MODELS_Q}`);
   await until(page, () => !!window.__GF, null, 180000);
   await page.evaluate(() => {
     localStorage.clear();
@@ -176,7 +189,7 @@ const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { time
   // 14 Save, reload, continue.
   await page.evaluate(() => window.__GF.save());
   const saved = { xp: s.xp, inv: s.inventory, done: s.contractsCompleted };
-  await page.goto(`${URL}?debug=1&quality=${QUALITY}&slot=journey`);
+  await page.goto(`${URL}?debug=1&quality=${QUALITY}&slot=journey${MODELS_Q}`);
   await until(page, () => !!window.__GF, null, 180000);
   await page.click('[data-t="continue"]');
   await until(page, () => window.__GF.state().mode !== "title");

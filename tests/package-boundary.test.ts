@@ -81,7 +81,9 @@ test("the GLB asset pipeline and hero models exist only in Full", () => {
 test("hero models are copied only into Full builds, never into Lite", async () => {
   const { existsSync } = await import("node:fs");
   assert.ok(existsSync(join(ROOT, "dist/web/models/manifest.json")), "Full release build carries models/manifest.json");
+  assert.ok(existsSync(join(ROOT, "dist/web/models/astronaut/tnnv-spacesuit.glb")), "Full release build carries the tnnv astronaut GLB");
   assert.ok(!existsSync(join(ROOT, "dist/telegram/models")), "Lite build has no models folder");
+  assert.ok(!existsSync(join(ROOT, "dist/telegram/index.html")) || !readFileSync(join(ROOT, "dist/telegram/index.html"), "utf8").includes("tnnv-spacesuit"), "Lite never references the hero asset");
   assert.ok(full.html.includes("connect-src 'self'"), "Full CSP allows same-origin model fetches");
   assert.ok(!lite.html.includes("connect-src 'self'"), "Lite CSP keeps the no-fetch policy");
 });

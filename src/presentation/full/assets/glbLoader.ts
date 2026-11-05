@@ -103,7 +103,9 @@ export interface AssetEntry {
   variants: Partial<Record<"enhanced" | "ultra", string>>;
   /** Normalisation: model height in metres after scaling (default 1.8) and yaw (radians) to make it face +Z in game space. */
   height?: number;
-  yaw?: number;
+  yaw?: number | null;
+  /** SHA-256 of the shipped file (verified by tests; recorded so the credited asset is exactly the one shipped). */
+  sha256?: string;
   /** Required attribution / licence record shown in credits. */
   license: { name: string; url: string; author: string; source: string; title: string };
 }

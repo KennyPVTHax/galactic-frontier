@@ -1064,7 +1064,7 @@ export class Game {
   private openPanel(p: PanelId): void {
     this.input.setMode("ui");
     if (p === "inventory") this.hud.showInventory(this.inventory.snapshot(), this.inventory.capacity, this.levels);
-    else if (p === "settings") this.hud.showSettings(this.settings, this.prefs, { ...this.tierDecision, platform: this.platform.kind }, this.backend.mode === "online" ? "OrbitBtc servers (online)" : "offline prototype");
+    else if (p === "settings") this.hud.showSettings(this.settings, this.prefs, { ...this.tierDecision, platform: this.platform.kind }, this.backend.mode === "online" ? "OrbitBtc servers (online)" : "offline prototype", this.credits());
     else if (p === "terminal") {
       if (this.ship.state !== "docked") return this.closePanel();
       this.hud.showTerminal(this.inventory.snapshot(), this.levels, this.mission.state, this.mission.step === "deliver" ? "expedition" : undefined);
@@ -1467,6 +1467,13 @@ export class Game {
       this.space = null;
       console.warn("space environment unavailable", e);
     }
+  }
+
+  /** Third-party asset credits shown in Settings (CC BY requires visible attribution); only assets actually in use are listed. */
+  private credits(): { title: string; author: string; licence: string; url: string; source: string }[] {
+    const lic = this.player.model.status?.license;
+    const hero = this.player.model.status?.mode === "glb";
+    return lic && hero ? [{ title: lic.title, author: lic.author, licence: lic.name, url: lic.url, source: lic.source }] : [];
   }
 
   /** Highest cinematic level this tier/device may reach (0 in Lite and on Basic). */

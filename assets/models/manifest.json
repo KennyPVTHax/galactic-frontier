@@ -1,1 +1,18 @@
-{ "version": 1, "assets": {} }
+{
+  "version": 1,
+  "assets": {
+    "astronaut": {
+      "variants": { "enhanced": "astronaut/tnnv-spacesuit.glb", "ultra": "astronaut/tnnv-spacesuit.glb" },
+      "height": 1.8,
+      "yaw": null,
+      "sha256": "b7f82d87b261b1ee8bccfd99f289dd299e0ab39e8e13be39c14d10b0ce7bcf31",
+      "license": {
+        "name": "CC BY 4.0",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "author": "tnnv",
+        "source": "https://sketchfab.com/3d-models/spacesuit-confederation-of-planets-da7b5c14bc634f8283e2d21343afa7cc",
+        "title": "Spacesuit (Confederation of Planets)"
+      }
+    }
+  }
+}

@@ -492,7 +492,7 @@ export class Hud {
     p.querySelector("[data-launch]")?.addEventListener("click", () => this.handlers?.onLaunch());
   }
 
-  showSettings(s: GameSettings, prefs: DevicePrefs, active: { tier: GraphicsTier; reason: string; platform: string }, backendMode: string): void {
+  showSettings(s: GameSettings, prefs: DevicePrefs, active: { tier: GraphicsTier; reason: string; platform: string }, backendMode: string, credits: { title: string; author: string; licence: string; url: string; source: string }[] = []): void {
     const m = this.theme.muted;
     const opt = (v: string, l: string) => `<option value="${v}" ${prefs.graphics === v ? "selected" : ""}>${l}</option>`;
     this.openWith(
@@ -509,7 +509,8 @@ export class Hud {
        <div class="gf-row"><span>Invert look Y</span><input id="gf-inv" type="checkbox" ${s.invertY ? "checked" : ""} data-s="invertY"></div>
        <div class="gf-row"><span>Show FPS</span><input id="gf-fps" type="checkbox" ${s.showFps ? "checked" : ""} data-s="showFps"></div>
        <div class="gf-row"><span>Progress</span><button class="gf-btn ghost" data-reset>Reset save</button></div>
-       <p class="gf-note">Platform: ${esc(active.platform)} · Backend: ${esc(backendMode)}. Graphics never change resources, mission difficulty or rewards. Progress autosaves every 20 seconds.</p>`,
+       <p class="gf-note">Platform: ${esc(active.platform)} · Backend: ${esc(backendMode)}. Graphics never change resources, mission difficulty or rewards. Progress autosaves every 20 seconds.</p>
+       ${credits.length ? `<div class="gf-label" style="margin-top:12px">Credits</div>${credits.map((c) => `<p class="gf-note">“${esc(c.title)}” by ${esc(c.author)} — <a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" style="color:inherit">${esc(c.licence)}</a> · ${esc(c.source)}</p>`).join("")}` : ""}`,
     );
     const p = this.el.panel;
     const H = () => this.handlers;

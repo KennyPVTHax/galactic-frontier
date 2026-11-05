@@ -135,3 +135,94 @@ test("loading a missing model resolves with a reason instead of throwing (safe f
   assert.equal(r.ok, false);
   assert.ok(!r.ok && r.reason.length > 0);
 });
+
+// ---------------------------------------------------------------------------------------------------------------------------------------
+// The shipped hero model: tnnv "Spacesuit (Confederation of Planets)", CC BY 4.0
+// ---------------------------------------------------------------------------------------------------------------------------------------
+import { createHash } from "node:crypto";
+import { findIkTwins } from "../src/presentation/full/assets/humanoidRig";
+
+const HERO = fileURLToPath(new URL("../assets/models/astronaut/tnnv-spacesuit.glb", import.meta.url));
+const MANIFEST = JSON.parse(readFileSync(fileURLToPath(new URL("../assets/models/manifest.json", import.meta.url)), "utf8"));
+const CREDITS = readFileSync(fileURLToPath(new URL("../assets/models/CREDITS.md", import.meta.url)), "utf8");
+
+function glbJson(buf: Buffer): any {
+  const len = buf.readUInt32LE(12);
+  return JSON.parse(buf.subarray(20, 20 + len).toString("utf8"));
+}
+
+test("hero asset: shipped file is exactly the credited one, and licence/credit records agree with the file's own metadata", () => {
+  const bytes = readFileSync(HERO);
+  assert.equal(createHash("sha256").update(bytes).digest("hex"), MANIFEST.assets.astronaut.sha256, "manifest hash matches the shipped bytes");
+  const extras = glbJson(bytes).asset.extras;
+  const lic = MANIFEST.assets.astronaut.license;
+  assert.equal(lic.author, "tnnv");
+  assert.equal(lic.name, "CC BY 4.0");
+  assert.match(extras.license, /CC-BY-4\.0/);
+  assert.match(extras.author, /tnnv/);
+  assert.equal(extras.source, lic.source, "embedded source URL equals the manifest's");
+  assert.equal(extras.title, lic.title);
+  for (const needle of ["tnnv", "CC BY 4.0", "creativecommons.org/licenses/by/4.0", lic.source, MANIFEST.assets.astronaut.sha256]) assert.ok(CREDITS.includes(needle), `CREDITS.md mentions ${needle}`);
+});
+
+test("hero asset: authored structure is what the pipeline expects (26,006 tris, 70 joints, 4 meshes, 4 PBR materials, no clips)", () => {
+  const g = glbJson(readFileSync(HERO));
+  const tris = g.meshes.reduce((a: number, m: any) => a + m.primitives.reduce((b: number, p: any) => b + g.accessors[p.indices].count / 3, 0), 0);
+  assert.equal(tris, 26006);
+  assert.equal(g.skins[0].joints.length, 70);
+  assert.equal(g.meshes.length, 4);
+  assert.equal(g.materials.length, 4);
+  assert.equal((g.animations ?? []).length, 0);
+  assert.equal(g.images.length, 8, "all original textures are embedded");
+});
+
+test("hero asset: skeleton maps completely, finds the right-arm IK twins, and both arms move identically (no torn forearm/hand)", async () => {
+  registerGlbSupport();
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const url = "data:application/octet-stream;base64," + readFileSync(HERO).toString("base64");
+  const r = await loadModel(scene, url, 60000);
+  assert.ok(r.ok, r.ok ? "" : r.reason);
+  if (!r.ok) throw new Error("unreachable");
+  r.model.container.addAllToScene();
+  const frame = (r.model.container.meshes.find((m) => m.name === "__root__") ?? null) as TransformNode | null;
+  const rd = new RigDriver(frame, r.model.nodes);
+  assert.deepEqual(rd.missing, [], "no required humanoid bone missing");
+  const n = (i: number | undefined) => r.model.nodes[i as number]?.name;
+  assert.equal(n(rd.map.hips), "pelvis_02");
+  assert.equal(n(rd.map.lForeArm), "lowerarm_l_011");
+  assert.equal(n(rd.map.rHand), "hand_r_036");
+  assert.equal(n(rd.map.lToe), "ball_l_064");
+  assert.equal(n(rd.twins.rArm), "upperarm_ik_r_033", "right upper-arm IK twin");
+  assert.equal(n(rd.twins.rForeArm), "lowerarm_ik_r_034", "right forearm IK twin");
+  assert.equal(rd.twins.lArm, undefined, "left arm is a plain FK chain");
+  assert.equal(rd.twins.rFoot, undefined, "foot_ik targets are not deformation bones");
+
+  const find = (name: string) => r.model.nodes.find((x) => x.name === name)!;
+  const wpos = (name: string) => { const node = find(name); node.computeWorldMatrix(true); return node.getAbsolutePosition().clone(); };
+  const neutral = new GaitState().update(0.016, 0, true, false, false, 0);
+  const pose = { ...neutral, armX: [0.9, 0.9] as [number, number], armZ: [0.1, -0.1] as [number, number], foreX: [-1.3, -1.3] as [number, number], thighX: [0, 0] as [number, number], shinX: [0, 0] as [number, number], ankleX: [0, 0] as [number, number], thighZ: [0, 0] as [number, number], hipsX: 0, hipsY_rot: 0, hipsZ: 0, chestX: 0, chestY: 0, chestZ: 0, headX: 0, headY: 0, headZ: 0, hipsY: 0 };
+  rd.reset();
+  const seg = (a: string, b: string) => wpos(b).subtract(wpos(a));
+  const SEGS: [string, string, string, string, string][] = [
+    ["upper arm", "upperarm_l_09", "lowerarm_l_011", "upperarm_r_030", "lowerarm_r_032"],
+    ["forearm -> hand", "lowerarm_l_011", "hand_l_013", "lowerarm_r_032", "hand_r_036"],
+    ["forearm -> twist", "lowerarm_l_011", "lowerarm_twist_01_l_012", "lowerarm_r_032", "lowerarm_twist_01_r_035"],
+    ["hand -> fingertip", "hand_l_013", "middle_03_l_016", "hand_r_036", "middle_03_r_039"],
+  ];
+  const rest = SEGS.map(([, a, b, c, d]) => [seg(a, b), seg(c, d)]);
+  rd.applyPose(pose);
+  const angle = (u: Vector3, v: Vector3) => Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(u.normalizeToNew(), v.normalizeToNew()))));
+  SEGS.forEach(([label, a, b, c, d], i) => {
+    const turnedL = angle(rest[i][0], seg(a, b)), turnedR = angle(rest[i][1], seg(c, d));
+    assert.ok(turnedL > 0.3, `${label}: left segment turned (${turnedL.toFixed(2)} rad)`);
+    assert.ok(turnedR > 0.3, `${label}: right segment turned too — it is not left behind by an unposed IK chain (${turnedR.toFixed(2)} rad)`);
+    assert.ok(Math.abs(turnedL - turnedR) < 0.35, `${label}: both sides turn by about the same angle (L ${turnedL.toFixed(2)} vs R ${turnedR.toFixed(2)})`);
+  });
+  const lk = wpos("lowerarm_r_032"), ik = wpos("lowerarm_ik_r_034");
+  assert.ok(Vector3.Distance(lk, ik) < 1e-3, "the IK twin stays exactly on its FK primary");
+  const restHandPos = wpos("hand_l_013");
+  rd.reset();
+  const back = wpos("hand_l_013");
+  assert.ok(Vector3.Distance(back, restHandPos) > 0.2, "reset moved the hand back from the posed position");
+});

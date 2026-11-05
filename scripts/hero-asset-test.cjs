@@ -80,6 +80,29 @@ const settle = async (p, mode) => { try { await p.waitForFunction((m) => { const
     check("2. no page errors", errs.length === 0, errs.slice(0, 2).join("|") + JSON.stringify(fwd));
     await page.close();
   }
+  // 2b. the REAL shipped model (assets/models), served exactly as the APK would serve it
+  {
+    const dir = path.resolve(__dirname, "../assets/models");
+    const real = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
+    const { page, errs } = await open(browser, "ultra", (r, f) => {
+      const file = path.join(dir, decodeURIComponent(f));
+      if (!file.startsWith(dir) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return r.fulfill({ status: 404, headers: CORS, body: "" });
+      r.fulfill({ status: 200, headers: { ...CORS, "content-type": file.endsWith(".glb") ? "model/gltf-binary" : "application/json" }, body: fs.readFileSync(file) });
+    });
+    await settle(page, "glb");
+    const a = await astro(page);
+    check("2b. real tnnv model adopted: 4 meshes, 26,006 triangles", a.mode === "glb" && a.meshes === 4 && a.triangles === 26006, JSON.stringify({ mode: a.mode, meshes: a.meshes, tris: a.triangles, loadMs: a.loadMs }));
+    check("2b. skeleton understood incl. right-arm IK twins", a.rig && a.rig.bones >= 21 && a.rig.ikTwins.includes("upperarm_ik_r_033") && a.rig.ikTwins.includes("lowerarm_ik_r_034"), JSON.stringify(a.rig));
+    check("2b. credit data comes from the manifest (tnnv, CC BY 4.0)", a.license && a.license.author === "tnnv" && a.license.name === "CC BY 4.0" && a.license.source === real.assets.astronaut.license.source, JSON.stringify(a.license).slice(0, 120));
+    const geo = await page.evaluate(() => { const g = window.__GF.game, m = g.player.model; let minY = 1e9, maxY = -1e9; for (const b of m.meshes) { b.refreshBoundingInfo({ applySkeleton: true }); const bb = b.getBoundingInfo().boundingBox; minY = Math.min(minY, bb.minimumWorld.y); maxY = Math.max(maxY, bb.maximumWorld.y); } return { height: maxY - minY, feet: minY - g.player.position.y }; });
+    check("2b. normalised to ~1.8 m with feet on the ground", Math.abs(geo.height - 1.8) < 0.2 && Math.abs(geo.feet) < 0.15, JSON.stringify(geo));
+    await page.evaluate(() => window.__GF.game.openPanel("settings"));
+    await page.waitForTimeout(800);
+    const txt = await page.evaluate(() => document.body.innerText);
+    check("2b. Settings shows the CC BY credit to tnnv", /Spacesuit \(Confederation of Planets\)/.test(txt) && /tnnv/.test(txt) && /CC BY 4\.0/.test(txt), (txt.match(/“[^\n]*tnnv[^\n]*/) || ["(not found)"])[0].slice(0, 140));
+    check("2b. no page errors", errs.length === 0, errs.slice(0, 2).join("|"));
+    await page.close();
+  }
   // 3. GLB missing
   {
     const { page, errs } = await open(browser, "ultra", (r, f) => (f === "manifest.json" ? r.fulfill({ status: 200, headers: { ...CORS, "content-type": "application/json" }, body: manifest }) : r.fulfill({ status: 404, headers: CORS, body: "" })));

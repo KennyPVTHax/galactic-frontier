@@ -1,5 +1,7 @@
 # Astronaut asset research (Android Full hero character)
 
+> **Update:** the owner uploaded candidate #2 (tnnv) and it is now integrated — see `docs/ASTRONAUT-TNNV.md`. Findings about that file (it is *not* the unrigged version described below: the uploaded GLB has a 70-joint skeleton) supersede the table's "not rigged" note for #2. The rest of this document is kept as the research record.
+
 Purpose: find professionally authored, realistic, rigged, PBR astronaut models whose licence allows redistribution inside a game.
 Method: Sketchfab's public search/model API (licence, face counts, animation counts, previews), the NASA 3D Resources repository (file tree + the files
 themselves), NASA's media-usage guidelines page, and marketplace listing pages. **Nothing below has been downloaded into the game or committed to the repo.**

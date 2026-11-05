@@ -87,6 +87,9 @@ jobs:
           test -s /tmp/game.html
           if grep -q "window.__GF" /tmp/game.html; then echo "test hooks found in bundled game"; exit 1; fi
           unzip -l "$APK" | grep -q "assets/www/models/manifest.json" || { echo "hero-model manifest missing from the APK"; exit 1; }
+          unzip -l "$APK" | grep -q "assets/www/models/astronaut/tnnv-spacesuit.glb" || { echo "tnnv astronaut GLB missing from the APK"; exit 1; }
+          unzip -l "$APK" | grep -q "assets/www/models/CREDITS.md" || { echo "model credits missing from the APK"; exit 1; }
+          unzip -p "$APK" assets/www/models/astronaut/tnnv-spacesuit.glb | sha256sum | grep -q b7f82d87b261b1ee8bccfd99f289dd299e0ab39e8e13be39c14d10b0ce7bcf31 || { echo "APK GLB differs from the credited asset"; exit 1; }
           echo "APK hero models:"; unzip -l "$APK" | grep "assets/www/models/" || true
           mkdir -p out
           cp "$APK" out/galactic-frontier-m7-debug.apk

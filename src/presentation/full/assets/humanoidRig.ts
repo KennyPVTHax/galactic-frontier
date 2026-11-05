@@ -93,3 +93,31 @@ export const REQUIRED_BONES: HumanoidBone[] = ["hips", "head", "lArm", "rArm", "
 export function missingBones(map: HumanoidMap): HumanoidBone[] {
   return REQUIRED_BONES.filter((b) => map[b] === undefined);
 }
+
+const IK_TOKEN = /(^|[._\- :])ik(?=[._\- :]|$)/i;
+
+/**
+ * Some exporters (FBX -> Unreal-style rigs) leave a duplicate "IK" arm/leg chain that actually parents the forearm-twist and hand bones,
+ * while the FK twin (`lowerarm_r`) is a leaf. Skin weights then sit on bones under the IK chain, so the SAME pose command must reach both.
+ * A bone is an IK twin of a mapped bone when its name is that bone's name plus an `ik` token (same side) AND it parents another mapped bone
+ * (so pure IK *targets* such as `foot_ik_r` are not mistaken for deformation bones).
+ */
+export function findIkTwins(bones: BoneInfo[], map: HumanoidMap): HumanoidMap {
+  const children = bones.map(() => [] as number[]);
+  bones.forEach((b, i) => { if (b.parent !== null) children[b.parent].push(i); });
+  const mappedSet = new Set(Object.values(map).filter((v): v is number => v !== undefined));
+  const subtreeHasMapped = (i: number): boolean => children[i].some((c) => mappedSet.has(c) || subtreeHasMapped(c));
+  const twins: HumanoidMap = {};
+  bones.forEach((b, i) => {
+    if (!IK_TOKEN.test(b.name)) return;
+    const stripped = b.name.replace(IK_TOKEN, "$1").replace(/[._\- :]{2,}/g, "_");
+    const core = coreName(stripped);
+    const cls = classify(core, stripped);
+    const side = sideOf(stripped);
+    if (!cls || cls === "spineish" || !side || cls === "hips" || cls === "neck" || cls === "head") return;
+    const key = (side + cls.slice(1)) as HumanoidBone;
+    if (map[key] === undefined || map[key] === i || !subtreeHasMapped(i)) return;
+    twins[key] = i;
+  });
+  return twins;
+}

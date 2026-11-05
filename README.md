@@ -167,3 +167,5 @@ See [docs/M8-REPORT.md](docs/M8-REPORT.md): shared gameplay core, Telegram *Lite
 
 ## Android Full hero assets
 Authored GLB/PBR pipeline (loader, skeleton retargeting, fallbacks, APK packaging): [docs/ASSET-PIPELINE.md](docs/ASSET-PIPELINE.md). Candidate models and licences: [docs/ASSET-RESEARCH.md](docs/ASSET-RESEARCH.md). Visual acceptance standard: [docs/VISUAL-STANDARD.md](docs/VISUAL-STANDARD.md).
+
+Astronaut (tnnv, CC BY 4.0) integration and screenshots: [docs/ASTRONAUT-TNNV.md](docs/ASTRONAUT-TNNV.md).

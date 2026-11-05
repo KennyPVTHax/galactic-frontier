@@ -8,7 +8,7 @@
  *
  * The procedural astronaut is NOT the realistic character; `status.mode` reports honestly which one is on screen.
  */
-import { TransformNode, Vector3, Scene, StandardMaterial, Color3, Mesh, MeshBuilder } from "../../engine/babylon";
+import { TransformNode, Vector3, Quaternion, Scene, StandardMaterial, Color3, Mesh, MeshBuilder } from "../../engine/babylon";
 import type { AbstractMesh } from "../../engine/babylon";
 import type { MaterialLibrary } from "../../graphics/materials";
 import { AstronautFull } from "./astronautFull";
@@ -26,6 +26,8 @@ export interface HeroStatus {
   triangles?: number;
   meshes?: number;
   missingBones?: string[];
+  /** How the skeleton was understood: humanoid bones found and IK-chain twins that receive the same pose commands. */
+  rig?: { bones: number; ikTwins: string[] };
   license?: AssetEntry["license"];
 }
 
@@ -44,7 +46,7 @@ export class AstronautHero {
   private readonly fallback: AstronautFull;
   private readonly muzzleProc: TransformNode;
   private readonly muzzleGlb: TransformNode;
-  private glb: { holder: TransformNode; model: LoadedModel; rig: RigDriver; flames: Mesh[]; scale: number } | null = null;
+  private glb: { holder: TransformNode; model: LoadedModel; rig: RigDriver; flames: Mesh[]; scale: number; mount: TransformNode | null; nozzleOffset: Vector3 } | null = null;
   private readonly gait = new GaitState();
   private tier = "basic";
   private started = false;
@@ -172,27 +174,32 @@ export class AstronautHero {
     holder.rotation.y = entry.yaw ?? this.detectYaw(rig, holder);
     for (const m of skinned) {
       m.isPickable = false;
+      // Transparent glass (visor) must not receive the sun's shadow map: it shows as speckle noise (shadow acne) on the see-through shell.
+      const mm = m.material as { alpha?: number; transparencyMode?: number | null } | null;
+      if (mm && ((mm.alpha ?? 1) < 1 || mm.transparencyMode === 2)) m.receiveShadows = false;
       m.alwaysSelectAsActiveMesh = true; // skinned bounds do not follow the pose; the character is always in view when on foot
       const mat = m.material as { environmentIntensity?: number } | null;
       if (mat && "environmentIntensity" in mat) mat.environmentIntensity = 1.1;
     }
     for (const g of model.clips) g.stop();
-    // Jetpack flames (the authored model has none): two cones behind the shoulder blades.
+    // Jetpack flames (the authored model has none): nozzles are located from the REAL backpack geometry (the rearmost vertices of the suit mesh
+    // between hip and shoulder height) and then follow the chest bone, leaning with the torso.
     const flameMat = new StandardMaterial("astro-hero-flame", this.scene);
     flameMat.emissiveColor = new Color3(0.45, 0.8, 1);
     flameMat.disableLighting = true;
     flameMat.alpha = 0.75;
     const flames: Mesh[] = [];
-    for (const sx of [-0.13, 0.13]) {
+    const { mount, nozzleOffset, nozzleLocal } = this.locateNozzles(model, rig, skinned);
+    for (const sx of [-0.1, 0.1]) {
       const f = MeshBuilder.CreateCylinder("astro-hero-flame", { height: 0.62, diameterTop: 0.13, diameterBottom: 0, tessellation: 10 }, this.scene);
       f.parent = this.root;
-      f.position.set(sx, 0.72, -0.34);
+      f.position.set(nozzleLocal.x + sx, nozzleLocal.y, nozzleLocal.z);
       f.material = flameMat;
       f.isPickable = false;
       f.setEnabled(false);
       flames.push(f);
     }
-    this.glb = { holder, model, rig, flames, scale };
+    this.glb = { holder, model, rig, flames, scale, mount, nozzleOffset };
     this.fallback.root.setEnabled(false);
     this.status = {
       mode: "glb",
@@ -202,7 +209,42 @@ export class AstronautHero {
       meshes: skinned.length,
       triangles: Math.round(skinned.reduce((a, m) => a + m.getTotalIndices() / 3, 0)),
       license: entry.license,
+      rig: { bones: Object.keys(rig.map).length, ikTwins: Object.values(rig.twins).map((i) => model.nodes[i as number]?.name ?? "?") },
     };
+  }
+
+  /**
+   * Finds where the jetpack nozzles belong on an authored model: the rearmost cluster of vertices of the biggest skinned mesh between hip and
+   * shoulder height (the life-support pack). Returns the chest bone to follow, the nozzle offset from it (character space, at rest) and the rest position.
+   */
+  private locateNozzles(model: LoadedModel, rig: RigDriver, skinned: AbstractMesh[]): { mount: TransformNode | null; nozzleOffset: Vector3; nozzleLocal: Vector3 } {
+    const chestBone = rig.bone("chest") ?? rig.bone("spine");
+    const fallback = { mount: chestBone, nozzleOffset: new Vector3(0, -0.25, -0.2), nozzleLocal: new Vector3(0, 0.9, -0.3) };
+    const mesh = skinned.filter((m) => m.isVerticesDataPresent("position")).sort((a, b) => b.getTotalIndices() - a.getTotalIndices())[0];
+    if (!mesh || !chestBone) return fallback;
+    this.root.computeWorldMatrix(true);
+    const inv = this.root.getWorldMatrix().clone().invert();
+    mesh.computeWorldMatrix(true);
+    const wm = mesh.getWorldMatrix();
+    const pos = mesh.getVerticesData("position");
+    if (!pos) return fallback;
+    const pts: Vector3[] = [];
+    const v = new Vector3();
+    for (let i = 0; i < pos.length; i += 3) {
+      Vector3.TransformCoordinatesFromFloatsToRef(pos[i], pos[i + 1], pos[i + 2], wm, v);
+      const l = Vector3.TransformCoordinates(v, inv);
+      if (l.y > 0.95 && l.y < 1.55) pts.push(l);
+    }
+    if (!pts.length) return fallback;
+    let minZ = Infinity;
+    for (const p of pts) minZ = Math.min(minZ, p.z);
+    const cluster = pts.filter((p) => p.z < minZ + 0.1);
+    let lowY = Infinity, sx = 0;
+    for (const p of cluster) { lowY = Math.min(lowY, p.y); sx += p.x; }
+    const nozzleLocal = new Vector3(sx / cluster.length, lowY + 0.03, minZ + 0.07);
+    chestBone.computeWorldMatrix(true);
+    const chest = Vector3.TransformCoordinates(chestBone.getAbsolutePosition(), inv);
+    return { mount: chestBone, nozzleOffset: nozzleLocal.subtract(chest), nozzleLocal };
   }
 
   /** Rotation about Y that makes the authored model face +Z (game forward): measured from the left foot -> toe direction at rest. */
@@ -227,13 +269,24 @@ export class AstronautHero {
     }
     const pose = this.gait.update(dt, speed, grounded, jetting, aiming, aimPitch, vy);
     this.glb.rig.applyPose(pose, this.glb.scale);
-    for (const f of this.glb.flames) {
+    if (pose.jet > 0 && this.glb.mount) {
+      this.glb.mount.computeWorldMatrix(true);
+      this.root.computeWorldMatrix(true);
+      const chest = Vector3.TransformCoordinates(this.glb.mount.getAbsolutePosition(), this.root.getWorldMatrix().clone().invert());
+      const lean = Quaternion.RotationAxis(new Vector3(1, 0, 0), pose.hipsX);
+      const off = this.glb.nozzleOffset.clone();
+      off.rotateByQuaternionToRef(lean, off);
+      this.glb.flames.forEach((f, i) => {
+        f.position.set(chest.x + off.x + (i === 0 ? -0.1 : 0.1), chest.y + off.y, chest.z + off.z);
+      });
+    }
+    this.glb.flames.forEach((f, i) => {
       f.setEnabled(pose.jet > 0);
       if (pose.jet > 0) {
-        f.scaling.y = (0.8 + 0.2 * Math.sin(performance.now() * 0.06)) * pose.jet;
+        f.scaling.y = (0.8 + 0.2 * Math.sin(performance.now() * 0.06 + i)) * pose.jet;
         f.rotation.x = pose.gimbal;
       }
-    }
+    });
     // Mining beam origin: just past the right hand, along the forearm direction (the authored model has no tool prop yet).
     const hand = this.glb.rig.bone("rHand"), fore = this.glb.rig.bone("rForeArm");
     if (hand && fore) {

@@ -106,9 +106,9 @@ ground; muzzle follows the hand; missing GLB -> fallback; corrupt GLB -> fallbac
 | Draco / KTX2 compressed assets | **Wired, unverified** — no compressed asset or decoder files exist in the repo to test with |
 | Distance LOD for the character | **Not implemented**; the camera is 3-7 m away on foot, so tiers cover it. Needed later for NPC crowds |
 | Playing authored animation clips (Mixamo walk etc.) | **Not implemented**: the rig is driven procedurally. Planned: blend clips by name for idle/walk/run, keep procedural poses for aim/jet/land |
-| Mining-tool prop for the authored model | **Not implemented**; the beam starts at the hand |
+| Mining-tool prop, finger/grip animation, twist-bone driving | **Not implemented**; the beam starts at the hand; IK-chain twins (right arm of the tnnv rig) **are** handled |
 | Jetpack flames for the authored model | Simple cones, **not visually verified on a real asset** |
-| A real, licensed, realistic astronaut in the game | **Not done — needs your decision/download (see `docs/ASSET-RESEARCH.md`)** |
+| A real, licensed, realistic astronaut in the game | **Done: tnnv "Spacesuit (Confederation of Planets)", CC BY 4.0 — see `docs/ASTRONAUT-TNNV.md`** (awaiting the owner's appearance approval) |
 | Real-device performance of any of this | **Not measured** |
 
 Bundle impact (Full): +~260 KB JS for the loader (the loader's OpenPBR material, ~230 KB, is stubbed out because glTF here uses the standard PBR material). Lite: unchanged.
