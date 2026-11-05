@@ -8,6 +8,7 @@ import type { GameSettings } from "../persistence/saveSystem";
 import { hudCss } from "./styles";
 import { frontierCss } from "./frontierUi";
 import type { DevicePrefs } from "../persistence/devicePrefs";
+import { IS_LITE } from "../core/package";
 import { PROFILES, type GraphicsTier } from "../graphics/profiles";
 
 export interface ScreenMarker {
@@ -499,7 +500,7 @@ export class Hud {
       `<header><h2>Settings</h2><button class="gf-x" aria-label="Close">✕</button></header>
        <div class="gf-label">Graphics · this device</div>
        <div class="gf-row"><span>Graphics preset<br><small style="color:${m}">Active: ${esc(PROFILES[active.tier].label)} (${esc(active.reason)})</small></span>
-         <select id="gf-graphics" data-s="graphics">${opt("auto", "Auto")}${opt("basic", PROFILES.basic.label)}${opt("enhanced", PROFILES.enhanced.label)}${opt("ultra", PROFILES.ultra.label)}</select></div>
+         <select id="gf-graphics" data-s="graphics">${opt("auto", "Auto")}${opt("basic", PROFILES.basic.label)}${IS_LITE ? "" : opt("enhanced", PROFILES.enhanced.label) + opt("ultra", PROFILES.ultra.label)}</select></div>
        <div class="gf-row"><span>Render resolution<br><small style="color:${m}" data-resl>${Math.round(prefs.resolution * 100)}%</small></span><input id="gf-res" type="range" min="0.5" max="1" step="0.05" value="${prefs.resolution}" data-s="resolution"></div>
        <div class="gf-row"><span>Adaptive quality<br><small style="color:${m}">Lowers resolution, then effects, to hold the frame rate</small></span><input id="gf-adaptive" type="checkbox" ${prefs.adaptive ? "checked" : ""} data-s="adaptive"></div>
        <div class="gf-row"><span>Performance stats</span><input id="gf-perf" type="checkbox" ${prefs.perfStats ? "checked" : ""} data-s="perfStats"></div>

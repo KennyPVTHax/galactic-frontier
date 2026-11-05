@@ -4,7 +4,9 @@
 //   node scripts/build.mjs preview  -> dist/preview/index.html        (single self-contained playable file)
 //   node scripts/build.mjs serve    -> dev server on http://localhost:5173
 //   node scripts/build.mjs release  -> dist/web/index.html  (single playable file, test hooks compiled out)
-//   node scripts/build.mjs android  -> android/app/src/main/assets/www/index.html (same release bundle for the WebView app)
+//   node scripts/build.mjs android  -> android/app/src/main/assets/www/index.html (Galactic Frontier FULL: the Android package)
+//   node scripts/build.mjs telegram -> dist/telegram/index.html (Galactic Frontier LITE: the Telegram Mini App package)
+//   node scripts/build.mjs telegram-test -> dist/telegram-test/index.html (LITE + window.__GF test hooks; CI only, never shipped)
 //
 // `lib`, `preview` and `serve` keep the window.__GF test hooks (used by the browser tests). `release` and
 // `android` define __GF_DEBUG__=false so src/core/debugHooks.ts is dropped from the bundle.
@@ -42,7 +44,27 @@ if (babylonSrc && !existsSync(join(root, "node_modules/@babylonjs/core"))) {
 }
 
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-const releaseMode = mode === "release" || mode === "android";
+const releaseMode = mode === "release" || mode === "android" || mode === "telegram";
+// Presentation package. LITE is the Telegram Mini App; FULL is everything else (Android, desktop, preview).
+// Both run the identical shared gameplay core (see tests/architecture.test.ts + tests/package-parity.test.ts).
+const pkgName = mode === "telegram" || mode === "telegram-test" ? "lite" : "full";
+
+/**
+ * esbuild plugin shared by all packages: Babylon ships every shader twice (GLSL + WGSL). This game only creates a WebGL
+ * Engine, so the WGSL copies are dead weight (~420 KB). They are replaced by an empty module.
+ * LITE additionally swaps the engine facade for src/engine/babylon.lite.ts, which stubs the heavyweight features
+ * (PBR, post-process pipeline, cascaded shadows, reflection probes, ...) so their code and shaders never enter the bundle.
+ */
+const packagePlugin = {
+  name: "gf-package",
+  setup(b) {
+    b.onLoad({ filter: /[\\/]@babylonjs[\\/]core[\\/]ShadersWGSL[\\/].*\.js$/ }, () => ({ contents: "export {};", loader: "js" }));
+    if (pkgName === "lite") {
+      const lite = join(root, "src/engine/babylon.lite.ts");
+      b.onResolve({ filter: /(^|\/)engine\/babylon$/ }, (a) => (a.importer === lite ? undefined : { path: lite }));
+    }
+  },
+};
 const common = {
   bundle: true,
   format: "esm",
@@ -51,7 +73,9 @@ const common = {
   define: {
     __GF_VERSION__: JSON.stringify(pkg.version),
     __GF_DEBUG__: releaseMode ? "false" : "true",
+    __GF_PACKAGE__: JSON.stringify(pkgName),
   },
+  plugins: [packagePlugin],
   logLevel: "info",
   legalComments: "none",
   tsconfigRaw: undefined,
@@ -125,15 +149,28 @@ async function serve() {
   console.log(`[dev] http://localhost:${port}`);
 }
 
-async function buildRelease(outFile) {
+async function buildTelegramTest() {
+  // Same Lite bundle (same engine facade, same stubs), but with debug hooks so the real Lite code can be driven by the browser tests.
   const { js } = await buildPreviewBundle(true);
+  const out = join(root, "dist/telegram-test/index.html");
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, htmlShell(js));
+  console.log(`[build] telegram-test -> ${out} (${(Buffer.byteLength(js) / 1024).toFixed(0)} KB JS, debug hooks: ON — not for distribution)`);
+}
+
+async function buildRelease(outFile) {
+  const { js, meta } = await buildPreviewBundle(true);
   mkdirSync(dirname(outFile), { recursive: true });
   writeFileSync(outFile, htmlShell(js, true));
+  // Bundle composition (inputs → bytes). Kept outside the shipped HTML; tests/package-boundary.test.ts reads it.
+  if (mode !== "android") writeFileSync(join(dirname(outFile), "meta.json"), JSON.stringify(meta));
   console.log(`[build] ${mode} -> ${outFile} (${(Buffer.byteLength(js) / 1024).toFixed(0)} KB JS inlined, debug hooks: off)`);
 }
 
 if (mode === "release") await buildRelease(join(root, "dist/web/index.html"));
 else if (mode === "android") await buildRelease(join(root, "android/app/src/main/assets/www/index.html"));
+else if (mode === "telegram") await buildRelease(join(root, "dist/telegram/index.html"));
+else if (mode === "telegram-test") await buildTelegramTest();
 else if (mode === "lib") await buildLib();
 else if (mode === "preview") await buildPreview();
 else if (mode === "serve") await serve();

@@ -9,6 +9,7 @@
  * `?quality=` use them). Only the display label of `ultra` changed in M3
  * ("Android Extreme HD"); the M2 label is kept in `legacyLabel`.
  */
+import { IS_LITE } from "../core/package";
 export type GraphicsTier = "basic" | "enhanced" | "ultra";
 export type GraphicsSetting = GraphicsTier | "auto";
 export type PlatformKind = "telegram" | "android-app" | "android-browser" | "ios-browser" | "desktop";
@@ -312,6 +313,9 @@ export function isFlagship(c: GpuCapabilities): boolean {
   return STRONG_DESKTOP_GPU.test(r) && mem >= 8;
 }
 
+/** The Lite (Telegram) package never renders above this tier; its bundle does not even contain the heavier features. */
+export const LITE_TIER_CEILING: GraphicsTier = "basic";
+
 export interface TierDecision {
   tier: GraphicsTier;
   reason: string;
@@ -323,6 +327,12 @@ export interface TierDecision {
  * and the runtime governor still protects frame rate).
  */
 export function resolveTier(setting: GraphicsSetting, platform: PlatformKind, caps: GpuCapabilities): TierDecision {
+  const d = resolveTierUnclamped(setting, platform, caps);
+  if (IS_LITE && tierIndex(d.tier) > tierIndex(LITE_TIER_CEILING)) return { tier: LITE_TIER_CEILING, reason: "Lite package" };
+  return d;
+}
+
+function resolveTierUnclamped(setting: GraphicsSetting, platform: PlatformKind, caps: GpuCapabilities): TierDecision {
   if (setting !== "auto") return { tier: setting, reason: "player setting" };
   const def = platformDefaultTier(platform);
   const ceil = capabilityCeiling(caps);

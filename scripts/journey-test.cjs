@@ -20,7 +20,8 @@ const fs = require("fs");
 
 const OUT = path.resolve(process.argv[2] || "test-results/journey");
 const QUALITY = process.argv[3] || "basic";
-const URL = "file://" + path.resolve(__dirname, "../dist/preview/index.html");
+// GF_BUILD selects the bundle under test: preview (Full + hooks, default) or telegram-test (Lite + hooks).
+const URL = "file://" + path.resolve(__dirname, `../dist/${process.env.GF_BUILD || "preview"}/index.html`);
 fs.mkdirSync(OUT, { recursive: true });
 
 const results = [];
