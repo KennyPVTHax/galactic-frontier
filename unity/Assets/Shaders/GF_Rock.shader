@@ -27,6 +27,7 @@ Shader "GF/Rock"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fog
+            #define GF_DEBUG 1
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
@@ -72,9 +73,12 @@ Shader "GF/Rock"
                 float3 arm = SAMPLE_TEXTURE2D(_ArmMap, sampler_BaseMap, i.uv).rgb;
 
                 float3 N0 = normalize(i.nw);
-                float3 T = normalize(i.tw.xyz);
-                float3 B = cross(N0, T) * i.tw.w;
+                float3 Tr = i.tw.xyz;
+                bool okT = dot(Tr, Tr) > 1e-6 && all(isfinite(Tr)) && abs(i.tw.w) > 0.5;
+                float3 T = okT ? normalize(Tr) : normalize(cross(N0, float3(0, 0, 1)) + float3(1e-4, 0, 0));
+                float3 B = cross(N0, T) * (okT ? i.tw.w : 1.0);
                 float3 N = normalize(tn.x * T + tn.y * B + tn.z * N0);
+                if (!all(isfinite(N))) N = N0;
 
                 // top cover (moss / dust): upward-facing, broken up by noise, less in cavities
                 float up = saturate(N.y * 0.5 + 0.5);
@@ -84,6 +88,9 @@ Shader "GF/Rock"
                 alb = lerp(alb, _MossColor.rgb * (0.7 + 0.6 * n1), cover);
                 float rough = lerp(arm.g, 0.88, cover);
 
+                #if defined(GF_DEBUG)
+                return half4(alb, 1);
+                #endif
                 SurfaceData sd = (SurfaceData)0;
                 sd.albedo = alb;
                 sd.metallic = 0;
@@ -103,6 +110,7 @@ Shader "GF/Rock"
                 id.shadowMask = half4(1, 1, 1, 1);
                 half4 c = UniversalFragmentPBR(id, sd);
                 c.rgb = MixFog(c.rgb, i.fog);
+                c.rgb = clamp(c.rgb, 0.0, 6.0);
                 c.a = 1;
                 return c;
             }

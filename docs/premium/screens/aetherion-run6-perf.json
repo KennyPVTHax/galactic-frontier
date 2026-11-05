@@ -1,0 +1,13 @@
+{
+  "gpu": "AMD Radeon RX 9070 XT",
+  "api": "Direct3D12",
+  "resolution": "1920x1080",
+  "quality": 3,
+  "frames": 14098,
+  "avgMs": 1.71,
+  "p99Ms": 2.71,
+  "avgFps": 585.3,
+  "grassBladesTotal": 769580,
+  "grassBladesDrawn": 109874,
+  "grassCells": 227
+}

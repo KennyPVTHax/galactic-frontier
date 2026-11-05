@@ -192,6 +192,7 @@ Shader "GF/Terrain"
 
                 half4 c = UniversalFragmentPBR(id, sd);
                 c.rgb = MixFog(c.rgb, IN.fog);
+                c.rgb = clamp(c.rgb, 0.0, 6.0);
                 c.a = 1;
                 return c;
             }

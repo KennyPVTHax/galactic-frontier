@@ -82,6 +82,8 @@ namespace GF.World
             return m;
         }
 
+        static float SS(float e0, float e1, float x) { float t = Mathf.Clamp01((x - e0) / (e1 - e0)); return t * t * (3f - 2f * t); }
+
         static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
 
         void LateUpdate()
@@ -175,16 +177,16 @@ namespace GF.World
                     // meadow patches: large tall-grass banks, short lawns, and bare soil
                     float big = (float)patchNoise.Fbm(x / 70.0, z / 70.0, 3) * 0.5f + 0.5f;
                     float small = (float)patchNoise.Noise2(x / 9.0 + 50, z / 9.0 - 20) * 0.5f + 0.5f;
-                    float dens = Mathf.SmoothStep(0.12f, 0.42f, big + (small - 0.5f) * 0.25f);
-                    dens *= 1f - Mathf.SmoothStep(MaxSlope * 0.6f, MaxSlope, slope);
-                    dens *= Mathf.SmoothStep(0f, 1.2f, y - (float)WaterLevel);              // thins out at the shore
+                    float dens = Mathf.Lerp(0.18f, 1f, SS(0.05f, 0.30f, big + (small - 0.5f) * 0.25f));
+                    dens *= 1f - SS(MaxSlope * 0.6f, MaxSlope, slope);
+                    dens *= SS(0f, 1.2f, y - (float)WaterLevel);              // thins out at the shore
                     float pad = Vector2.Distance(new Vector2(x, z), NoGrassCentre);
-                    dens *= Mathf.SmoothStep(NoGrassRadius, NoGrassRadius + 14f, pad);
+                    dens *= SS(NoGrassRadius, NoGrassRadius + 14f, pad);
                     if (keepR > dens) continue;
 
-                    float tall = Mathf.SmoothStep(0.25f, 0.8f, big);
+                    float tall = SS(0.25f, 0.8f, big);
                     float height = Mathf.Lerp(0.28f, 0.95f, tall) * Mathf.Lerp(0.7f, 1.25f, hR);
-                    height *= Mathf.Lerp(1f, 0.55f, Mathf.SmoothStep(0.15f, 0.42f, slope));
+                    height *= Mathf.Lerp(1f, 0.55f, SS(0.15f, 0.42f, slope));
                     float width = Mathf.Lerp(0.045f, 0.085f, wR) * Mathf.Lerp(0.8f, 1.3f, tall);
 
                     data.Add(new Vector4(x, y - 0.02f, z, yawR * Mathf.PI * 2f));

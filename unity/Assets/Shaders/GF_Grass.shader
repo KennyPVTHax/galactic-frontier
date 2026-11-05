@@ -137,7 +137,7 @@ Shader "GF/Grass"
 
             half4 frag(Varyings IN, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_Target
             {
-                float t = IN.data.x, seed = IN.data.y;
+                float t = saturate(IN.data.x), seed = IN.data.y;
                 float3 n = normalize(IN.nrmWS);
                 n = IS_FRONT_VFACE(face, n, -n);
 
@@ -154,7 +154,7 @@ Shader "GF/Grass"
                 float wrap = saturate((ndl + 0.45) / 1.45);
                 float shade = L.shadowAttenuation * L.distanceAttenuation;
 
-                float3 ambient = SampleSH(n) * ao;
+                float3 ambient = SampleSH(n) * ao * 1.35;
                 float3 diff = albedo * (L.color * wrap * shade + ambient);
 
                 // light shining through the blade towards the viewer
@@ -167,6 +167,7 @@ Shader "GF/Grass"
                 float spec = pow(saturate(dot(n, H)), 24.0) * _Smoothness * 0.35 * shade * t;
                 float3 col = diff + L.color * spec;
                 col = MixFog(col, IN.data.z);
+                col = clamp(col, 0.0, 8.0);
                 return half4(col, 1);
             }
             ENDHLSL

@@ -23,7 +23,7 @@ namespace GF.EditorTools
         const string PH = "Assets/ThirdParty/PolyHaven";
         const string Gen = "Assets/Generated";
         static readonly string[] GroundLayers = { "forest_ground_04", "brown_mud_leaves_01", "aerial_rocks_02", "dry_ground_rocks" };
-        static readonly string[] RockIds = { "namaqualand_boulder_02", "namaqualand_boulder_03", "namaqualand_boulder_05", "boulder_01", "namaqualand_cliff_01" };
+        static readonly string[] RockIds = { "namaqualand_boulder_02", "namaqualand_boulder_03", "namaqualand_boulder_05", "boulder_01", "namaqualand_cliff_01", "rock_07" };
 
         [MenuItem("Tools/Galactic Frontier/Build Aetherion Scene")]
         public static void BuildAll()
@@ -51,7 +51,10 @@ namespace GF.EditorTools
             asset.msaaSampleCount = 4;
             asset.shadowDistance = 160f;
             asset.shadowCascadeCount = 3;
-            asset.mainLightShadowmapResolution = 2048;
+            asset.shadowDepthBias = 1.2f;
+            asset.shadowNormalBias = 1.6f;
+            asset.mainLightShadowmapResolution = 4096;
+            asset.shadowCascadeCount = 4;
             asset.renderScale = 1f;
             EditorUtility.SetDirty(asset);
         }
@@ -103,8 +106,8 @@ namespace GF.EditorTools
             m.SetTexture("_NorArr", BuildArray("nor_gl", false, "Ground_Nor"));
             m.SetTexture("_ArmArr", BuildArray("arm", false, "Ground_Arm"));
             // alien palette: gentle tint of the (temperate) photoscans toward the planet's greens / ochres
-            m.SetColor("_Tint0", Color.Lerp(C(p.palette.mid, 1.7f), new Color(0.70f, 0.64f, 0.50f), 0.55f));
-            m.SetColor("_Tint1", Color.Lerp(C(p.palette.low, 2.0f), new Color(0.62f, 0.62f, 0.46f), 0.5f));
+            m.SetColor("_Tint0", new Color(0.56f, 0.70f, 0.40f));
+            m.SetColor("_Tint1", new Color(0.46f, 0.66f, 0.34f));
             m.SetColor("_Tint2", Color.Lerp(C(p.palette.rock, 1.9f), Color.white, 0.55f));
             m.SetColor("_Tint3", Color.Lerp(C(p.palette.basin, 2.4f), new Color(0.78f, 0.74f, 0.66f), 0.6f));
             m.SetColor("_PeakColor", C(p.palette.peak));
@@ -118,8 +121,8 @@ namespace GF.EditorTools
         {
             var p = LoadPlanet();
             var m = MakeMaterial("Aetherion_Grass", "GF/Grass");
-            m.SetColor("_BaseColor", Color.Lerp(C(p.palette.low, 0.3f), new Color(0.03f, 0.08f, 0.035f), 0.5f));
-            m.SetColor("_TipColor", Color.Lerp(C(p.palette.low, 1.35f), new Color(0.40f, 0.58f, 0.17f), 0.55f));
+            m.SetColor("_BaseColor", new Color(0.07f, 0.15f, 0.05f));
+            m.SetColor("_TipColor", new Color(0.58f, 0.78f, 0.24f));
             m.SetColor("_AccentColor", new Color(0.10f, 0.66f, 0.58f));
             m.SetFloat("_FadeStart", 62f); m.SetFloat("_FadeEnd", 100f);
             EditorUtility.SetDirty(m);
@@ -234,6 +237,7 @@ namespace GF.EditorTools
             boot.PlanetJson = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/GameData/aetherion.json");
             boot.TerrainMaterial = terrain; boot.GrassMaterial = grass; boot.WaterMaterial = water;
             boot.RockPrefabs = rocks; boot.Sun = sun;
+            var ph = MakeMaterial("Placeholder", "Universal Render Pipeline/Lit"); ph.SetColor("_BaseColor", new Color(0.85f, 0.87f, 0.9f)); boot.PlaceholderMaterial = ph;
             bgo.AddComponent<AutoCapture>();
             string astro = $"{Gen}/Prefabs/Astronaut.prefab";
             if (File.Exists(astro)) boot.AstronautPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(astro);
