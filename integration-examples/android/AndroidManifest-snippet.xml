@@ -1,0 +1,11 @@
+<!-- REFERENCE ONLY: add inside <application> of the OrbitBtc app when integrating. -->
+<!-- configChanges stops Android from recreating the Activity (and reloading the
+     WebView) on rotation / resize, so game state is preserved. -->
+<activity
+    android:name="com.orbitbtc.game.GalacticFrontierActivity"
+    android:exported="false"
+    android:hardwareAccelerated="true"
+    android:screenOrientation="sensorLandscape"
+    android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
+    android:theme="@style/Theme.AppCompat.NoActionBar"
+    android:resizeableActivity="true" />
