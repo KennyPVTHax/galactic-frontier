@@ -172,7 +172,9 @@ export class CombatRenderer {
           fx.explode(ev.position, 6, [1, 0.6, 0.3], 1);
           break;
         case "playerShieldHit":
-          fx.ripple(this.playerPos ?? ev.point, 6.5, [0.35, 0.85, 1.2], this.playerPos);
+          // The player's shield ripple is drawn by the ship model (ShipModel.shieldHit). A second
+          // sphere here covers the chase camera's view, so only a small spark marks the impact.
+          fx.sparks(ev.point, 5, [0.35, 0.85, 1.2]);
           break;
         case "playerHullDamage":
           fx.sparks(ev.point, 16, [1, 0.6, 0.25]);

@@ -60,6 +60,7 @@ export class Hud {
   private missionHtml = "";
   private contractHtml = "";
   private missionCollapsed = false;
+  private dmgTimer = 0;
   private last: Record<string, string> = {};
 
   constructor(
@@ -113,6 +114,7 @@ export class Hud {
       </div>
       </div>
       <div class="gf-rotate gf-hidden" data-el="rotate"><div class="gf-phone"></div><b>Rotate your device</b><span>Galactic Frontier plays in landscape.</span><button class="gf-btn ghost" data-portrait>Play in portrait</button></div>
+      <div class="gf-dmg" data-el="dmg"></div>
       <div class="gf-warp" data-el="warp"><div><b data-el="warptitle"></b><span data-el="warpsub"></span></div></div>
       <div class="gf-panelwrap" data-el="panelwrap"><div class="gf-panel gf-card" data-el="panel"></div></div>
       <div class="gf-title gf-hidden" data-el="title"></div>
@@ -234,6 +236,14 @@ export class Hud {
     (el.querySelector(".fill") as HTMLElement).style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
     (el.querySelector(".fill") as HTMLElement).style.background = ratio < 0.35 ? this.theme.danger : this.theme.accent2;
     this.set("suitlabel", esc(label), el.querySelector(".gf-label") as HTMLElement);
+  }
+
+  /** Brief red vignette when the hull takes damage (strength 0..1). */
+  flashDamage(strength: number): void {
+    const d = this.el.dmg;
+    d.style.opacity = String(0.25 + 0.6 * Math.max(0, Math.min(1, strength)));
+    clearTimeout(this.dmgTimer);
+    this.dmgTimer = window.setTimeout(() => (d.style.opacity = "0"), 160);
   }
 
   /** M4: warp transition overlay. phase null hides it. */

@@ -2656,9 +2656,12 @@ export class Planet {
     for (const m of this.gfMats) this.lib.release(m);
     this.gfMats.length = 0;
     const scene = this.scene;
-    for (const m of o.materials) if (!libOwned.has(m) && scene.materials.includes(m as never)) (m as { dispose(a?: boolean, b?: boolean): void }).dispose(true, false);
+    for (const m of o.materials) if (!libOwned.has(m) && scene.materials.includes(m as never)) (m as { dispose(a?: boolean, b?: boolean): void }).dispose(false, false); // keep cached effects: they are shared with other PBR materials (the ship)
     for (const t of o.textures) {
       if (!scene.textures.includes(t as never)) continue;
+      // Babylon creates the environment BRDF lookup lazily when the first PBR material is built, which can
+      // happen inside a Planet constructor. It is scene-wide: disposing it makes every PBR material unready.
+      if (/EnvironmentBRDF/i.test((t as { name?: string }).name ?? "")) continue;
       if (this.lib.isView(t)) this.lib.disposeView(t as Texture);
       else (t as { dispose(): void }).dispose();
     }

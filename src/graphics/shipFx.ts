@@ -395,7 +395,10 @@ export class SurfaceMaterial {
   private colorPbr(p: PBRMaterial): void {
     const L = this.look;
     p.albedoColor = new Color3(...L.color).toLinearSpace();
-    p.emissiveColor = L.emissive ? new Color3(...L.emissive).toLinearSpace().scale(1.8) : Color3.Black();
+    const glow = L.emissive ? new Color3(...L.emissive).toLinearSpace().scale(1.8) : Color3.Black();
+    // Small self-lit fill so hulls stay readable from below / in shadow (combat views often see the underside
+    // against dark terrain). ~7% of the albedo; the accent glow and lights are unchanged.
+    p.emissiveColor = glow.add(p.albedoColor.scale(0.07));
   }
 
   private createStd(): StandardMaterial {

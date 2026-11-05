@@ -72,7 +72,9 @@ function summarize(times) {
 async function sceneCounts(page) {
   return page.evaluate(() => {
     const s = window.__GF.game.scene;
-    return { meshes: s.meshes.length, materials: s.materials.length, textures: s.textures.length, lights: s.lights.length, particleSystems: s.particleSystems.length, transformNodes: s.transformNodes.length };
+    let unready = 0;
+    for (const m of s.meshes) if (m.material && m.isEnabled() && m.isVisible && m.getTotalVertices() > 0) { try { if (!m.material.isReady(m)) unready++; } catch (e) { unready++; } }
+    return { meshes: s.meshes.length, materials: s.materials.length, textures: s.textures.length, lights: s.lights.length, particleSystems: s.particleSystems.length, transformNodes: s.transformNodes.length, unreadyMaterials: unready };
   });
 }
 
@@ -128,7 +130,7 @@ async function run(browser, r) {
     const f = res.flight;
     console.log(`${r.name}: load ${res.loadMs} ms · ${f.avgFps} fps avg · 1% low ${f.low1PctFps} · p95 ${f.p95Ms} ms · heap peak ${f.peakHeapMB} MB · ${f.drawCalls} draws · ${f.trianglesK}k tris · tex ${f.textureMB} MB`);
     const worst = res.leakLap2VsLap1.reduce((m, x) => Math.max(m, Math.abs(x.dMeshes), Math.abs(x.dMaterials), Math.abs(x.dTextures), Math.abs(x.dLights)), 0);
-    console.log(`  transitions: ${res.transitions.length - 1}, max lap-2 vs lap-1 resource delta ${worst}, errors ${res.errors.length}`);
+    console.log(`  transitions: ${res.transitions.length - 1}, max lap-2 vs lap-1 resource delta ${worst}, max unready materials after a swap ${Math.max(...res.transitions.map((t) => t.unreadyMaterials ?? 0))}, errors ${res.errors.length}`);
   }
   await browser.close();
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

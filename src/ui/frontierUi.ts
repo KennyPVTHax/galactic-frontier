@@ -193,5 +193,6 @@ export function frontierCss(t: { accent: string; accent2: string; muted: string;
 .gf-warp b{display:block;font-size:22px;letter-spacing:.2em;text-transform:uppercase}
 .gf-warp span{font-size:13px;color:${t.accent2};letter-spacing:.12em;text-transform:uppercase}
 .gf-suit .fill{transition:width .2s linear}
+.gf-dmg{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s ease;z-index:4;box-shadow:inset 0 0 120px 30px rgba(255,40,40,.75)}
 `;
 }

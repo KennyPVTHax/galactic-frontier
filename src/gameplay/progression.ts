@@ -56,11 +56,11 @@ const NEW_WORLDS = PLANET_IDS.filter((p) => p !== "veyra7");
 export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "first_warp", name: "Beyond the Dock", description: "Complete your first warp jump.", xp: 25, test: (s) => s.warps >= 1 },
   { id: "first_blood", name: "First Contact", description: "Destroy a hostile spacecraft.", xp: 40, unlocksPaint: "ember", test: (s) => totalKills(s) >= 1 },
-  { id: "ace", name: "Ace of the Frontier", description: "Destroy 10 hostile spacecraft.", xp: 120, unlocksPaint: "midnight", test: (s) => totalKills(s) >= 10 },
+  { id: "ace", name: "Ace of the Frontier", description: "Destroy 10 hostile spacecraft.", xp: 120, unlocksPaint: "nightjar", test: (s) => totalKills(s) >= 10 },
   { id: "raider_breaker", name: "Raider Breaker", description: "Destroy a Heavy Raider.", xp: 80, test: (s) => (s.kills.raider ?? 0) >= 1 },
   { id: "squadron_down", name: "Wingclipper", description: "Destroy 4 Hunter fighters.", xp: 80, test: (s) => (s.kills.hunter ?? 0) >= 4 },
-  { id: "titan_fall", name: "Titanfall", description: "Bring down a Dreadnought.", xp: 300, unlocksPaint: "aurora", test: (s) => (s.kills.dreadnought ?? 0) >= 1 },
-  { id: "explorer", name: "Star Charter", description: "Visit all five new worlds.", xp: 150, unlocksPaint: "verdant", test: (s) => NEW_WORLDS.every((p) => s.visited.includes(p)) },
+  { id: "titan_fall", name: "Titanfall", description: "Bring down a Dreadnought.", xp: 300, unlocksPaint: "solstice", test: (s) => (s.kills.dreadnought ?? 0) >= 1 },
+  { id: "explorer", name: "Star Charter", description: "Visit all five new worlds.", xp: 150, unlocksPaint: "tidepool", test: (s) => NEW_WORLDS.every((p) => s.visited.includes(p)) },
   { id: "deep_survey", name: "Deep Survey", description: "Run a successful scan on every world.", xp: 120, test: (s) => PLANET_IDS.every((p) => s.scannedPlanets.includes(p)) },
   { id: "relic_hunter", name: "Relic Hunter", description: "Inspect 12 points of interest.", xp: 100, test: (s) => s.inspected >= 12 },
   { id: "contractor", name: "Trusted Contractor", description: "Complete 5 frontier contracts.", xp: 100, test: (s) => s.contractsCompleted >= 5 },
@@ -71,13 +71,13 @@ export interface PaintDef {
   name: string;
 }
 
-/** Cosmetic schemes; ids are shared with the ship model's PAINT_SCHEMES when available. */
+/** Cosmetic schemes; ids match PAINT_SCHEMES in src/vehicles/shipModel.ts. */
 export const PAINTS: PaintDef[] = [
-  { id: "factory", name: "Factory Ivory" },
-  { id: "ember", name: "Ember Stripe" },
-  { id: "midnight", name: "Midnight Ace" },
-  { id: "verdant", name: "Verdant Charter" },
-  { id: "aurora", name: "Aurora Titan" },
+  { id: "wayfarer", name: "Wayfarer Standard" },
+  { id: "ember", name: "Ember Run" },
+  { id: "nightjar", name: "Nightjar" },
+  { id: "tidepool", name: "Tidepool" },
+  { id: "solstice", name: "Solstice" },
 ];
 
 export function emptyKills(): Record<EnemyTypeId, number> {
@@ -85,7 +85,7 @@ export function emptyKills(): Record<EnemyTypeId, number> {
 }
 
 export function freshProgression(): ProgressionState {
-  return { xp: 0, kills: emptyKills(), visited: ["veyra7"], scannedPlanets: [], inspected: 0, warps: 0, contractsCompleted: 0, achievements: [], paint: "factory" };
+  return { xp: 0, kills: emptyKills(), visited: ["veyra7"], scannedPlanets: [], inspected: 0, warps: 0, contractsCompleted: 0, achievements: [], paint: "wayfarer" };
 }
 
 export function rankIndex(xp: number): number {
@@ -103,7 +103,7 @@ export function rankOf(xp: number): { index: number; title: string; next: RankDe
 }
 
 export function unlockedPaints(s: ProgressionState): string[] {
-  const out = ["factory"];
+  const out = ["wayfarer"];
   for (const a of ACHIEVEMENTS) if (a.unlocksPaint && s.achievements.includes(a.id)) out.push(a.unlocksPaint);
   return out;
 }
@@ -200,7 +200,7 @@ export class Progression {
       warps: num(r.warps),
       contractsCompleted: num(r.contractsCompleted),
       achievements: Array.isArray(r.achievements) ? [...new Set(r.achievements.filter((a: unknown): a is string => typeof a === "string" && known.has(a)))] : [],
-      paint: "factory",
+      paint: "wayfarer",
     };
     if (typeof r.paint === "string" && unlockedPaints(out).includes(r.paint)) out.paint = r.paint;
     return out;

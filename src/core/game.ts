@@ -39,6 +39,15 @@ import { starMapHtml, bindStarMap, frontierHtml, bindFrontier } from "../ui/fron
 import { RESOURCE_IDS as ALL_RESOURCES } from "../gameplay/resources";
 import type { SkyColors } from "../world/sky";
 import type { WorldLighting } from "../graphics/renderer";
+import { CombatSystem, DEFAULT_PLAYER_STATS } from "../combat/combatSystem";
+import { CombatRenderer } from "../combat/combatRenderer";
+import { CombatHud } from "../combat/combatHud";
+import type { CombatEvent } from "../combat/events";
+import { ENEMY_TYPES } from "../combat/enemyTypes";
+import { WarpFx } from "../graphics/warpFx";
+import { SpaceEnvironment } from "../world/space";
+import { PAINT_SCHEMES } from "../vehicles/shipModel";
+import { upgradeSum } from "./gameHelpers";
 
 export type GameOutEvent =
   | { type: "ready"; quality: QualityLevel; tier: GraphicsTier }
@@ -152,6 +161,14 @@ export class Game {
   private partialAll: Record<string, number> = {};
   private warp: { from: PlanetId; target: PlanetId; t: number; phase: "spool" | "tunnel" | "exit"; swapped: boolean; fromDock: boolean } | null = null;
   private starMapSel: PlanetId | null = null;
+  // ---- combat / effects
+  combat!: CombatSystem;
+  private combatRenderer!: CombatRenderer;
+  private combatHud!: CombatHud;
+  private warpFx!: WarpFx;
+  private space: SpaceEnvironment | null = null;
+  private combatStats = { shots: 0, hits: 0, kills: 0 };
+  private lastHullRatio = 1;
   private frontierTab: "contracts" | "pilot" = "contracts";
 
   get planetId(): PlanetId {
@@ -209,6 +226,19 @@ export class Game {
     if (!this.renderer) return;
     this.renderer.governor.enabled = this.prefs.adaptive;
     this.renderer.apply(this.currentProfile());
+    this.applyShipLook();
+  }
+
+  /** Ship model detail/paint, combat FX budgets and the orbital environment follow the active profile. */
+  private applyShipLook(): void {
+    const prof = this.currentProfile();
+    this.shipModel.setDetail(prof.shipDetail, prof.pbr);
+    const paint = this.progression.state.paint;
+    if (PAINT_SCHEMES[paint]) this.shipModel.setPaint(paint);
+    this.combatRenderer.setBudget(prof.combatFx);
+    this.combatRenderer.setPbr(prof.pbr);
+    this.space?.setDetail(prof.tier, prof);
+    this.combatHud.setTouch(this.input.touchActive);
   }
 
   private onOrientation(st: OrientationState): void {
@@ -266,6 +296,11 @@ export class Game {
     const wind = { get x() { return WorldUniforms.wind.x; }, get z() { return WorldUniforms.wind.y; } };
     this.envFx = new EnvironmentFx(this.scene, ptex, this.rig.camera, wind);
     this.shipFx = new ShipFx(this.scene, ptex, this.shipModel.nozzles);
+    this.combat = new CombatSystem({ seed: (Date.now() ^ 0x5bd1e995) & 0x7fffffff });
+    this.combatRenderer = new CombatRenderer(this.scene, { pbr: profile.pbr, detail: profile.tier === "basic" ? 0 : profile.tier === "enhanced" ? 1 : 2, lights: profile.tier === "basic" ? 0 : 1, budget: profile.combatFx });
+    this.combatHud = new CombatHud(this.hud.root);
+    this.combatHud.setTouch(this.input.touchActive);
+    this.warpFx = new WarpFx(this.scene, this.rig.camera, profile.warpFx.streaks);
     this.renderer = new Renderer(
       {
         engine: this.engine,
@@ -310,6 +345,8 @@ export class Game {
       maxAltitude: WORLD.maxAltitude,
     };
     this.bindPlanetGameplay();
+    this.applyShipLook();
+    this.onEnterPlanet();
     this.ship.placeDocked(this.shipEnv);
     this.syncShipModel(0);
     this.player.model.setVisible(false);
@@ -421,6 +458,8 @@ export class Game {
     this.arrivals = new Set(s.universe.arrivals);
     this.ship.speedScale = this.stats.speedScale;
     this.suit.reset();
+    this.onStatsChanged();
+    this.applyShipLook();
 
     if (s.ship.state === "landed") this.ship.placeLanded(this.shipEnv, s.ship.x, s.ship.z, s.ship.yaw);
     else this.ship.placeDocked(this.shipEnv);
@@ -586,6 +625,9 @@ export class Game {
     if (this.mode === "onFoot") this.updateFoot(dt, uiOpen ? blankInput(input) : input);
     else this.updateShip(dt, uiOpen ? blankInput(input) : input);
 
+    this.updateCombat(dt, uiOpen ? blankInput(input) : input);
+    this.space?.update(dt, this.rig.camera.position);
+    this.warpFx.update(dt);
     this.keepCameraOutsideStation();
     this.updateShadowFocus();
     this.updateWorldTimers(dt);
@@ -1175,6 +1217,9 @@ export class Game {
       if (Vector3.Distance(sp, this.player.position) > 20) add("ship", sp, WORLD.shipName, "#7fe3ff");
     }
     this.hud.setMarkers(markers);
+    const cv = this.combat.hudView(this.ship.hull, this.ship.maxHull);
+    this.combatHud.setVisible(this.mode === "ship" && this.ship.state === "flying" && !this.warp);
+    this.combatHud.update(cv, (p) => this.project(new Vector3(p.x, p.y, p.z)), this.canvas.clientWidth, this.canvas.clientHeight);
 
     // Compass
     const yaw = this.mode === "ship" && this.ship.state === "flying" ? this.ship.yaw : this.rig.yaw;
@@ -1272,15 +1317,156 @@ export class Game {
 
   /** Hook for systems that live per planet (combat, weather, space). */
   private onLeavePlanet(): void {
-    /* filled in by later integrations */
+    this.combat.clear();
+    this.combat.setPatrols(null);
+    this.space?.dispose();
+    this.space = null;
   }
 
   private onEnterPlanet(): void {
-    /* filled in by later integrations */
+    const def = this.planetDef;
+    this.combat.setPatrols(def.encounters.patrolInterval > 0 ? def.encounters : null, def.danger, upgradeSum(this.levels));
+    // Orbital belt: dense around Halcyon Dock, a sparse high-altitude field elsewhere.
+    const prof = this.currentProfile();
+    const st = WORLD.station.position;
+    const opts = def.hasStation
+      ? { seed: def.seed ^ 0xa57, center: { x: st.x, y: st.y, z: st.z }, radius: 520, altitude: st.y, count: 0, keepOut: [{ x: st.x, y: st.y, z: st.z, r: 120 }], tier: prof.tier }
+      : { seed: def.seed ^ 0xa57, center: { x: 0, y: def.maxAltitude * 0.85, z: 0 }, radius: def.flightRadius * 0.95, altitude: def.maxAltitude * 0.85, count: 16, innerRadius: def.flightRadius * 0.35, tier: prof.tier };
+    try {
+      this.space = new SpaceEnvironment(this.scene, opts);
+      this.space.setDetail(prof.tier, prof);
+    } catch (e) {
+      this.space = null;
+      console.warn("space environment unavailable", e);
+    }
   }
 
   private onStatsChanged(): void {
-    /* filled in by later integrations */
+    const st = this.stats;
+    this.combat.setPlayerStats({
+      maxShield: st.shield.max,
+      shieldRegen: st.shield.regenPerSec,
+      shieldDelay: st.shield.regenDelay,
+      weaponDamage: DEFAULT_PLAYER_STATS.weaponDamage * st.weapon.damageScale,
+      fireInterval: DEFAULT_PLAYER_STATS.fireInterval * st.weapon.intervalScale,
+    });
+    this.combat.playerShield = Math.min(this.combat.playerShield, st.shield.max);
+  }
+
+  /** The Wayfarer is "protected" (cannot be shot, cannot shoot) outside free flight. */
+  private combatProtected(): boolean {
+    return this.warp !== null || this.ship.state !== "flying" || this.mode !== "ship";
+  }
+
+  private updateCombat(dt: number, input: InputFrame): void {
+    const s = this.ship;
+    const prot = this.combatProtected();
+    // Contracts decide which encounters appear (first contact, waves, ambush, boss).
+    if (!prot) {
+      const enc = this.contracts.pendingSpawn(this.planetId, true);
+      if (enc) this.spawnContractEncounter(enc);
+    }
+    const f = s.forward();
+    const events = this.combat.update(
+      dt,
+      { x: s.x, y: s.y, z: s.z, vx: f.x * s.speed, vy: f.y * s.speed, vz: f.z * s.speed, forward: f, alive: s.hull > 0, protected: prot },
+      { fire: !prot && input.fire, cycleTarget: !prot && input.targetPressed, aimDir: f },
+      { groundAt: (x, z) => this.planet.groundAt(x, z), flightRadius: this.planetDef.flightRadius, maxAltitude: this.planetDef.maxAltitude },
+    );
+    if (events.length) this.handleCombatEvents(events);
+    this.combatRenderer.sync(this.combat, dt, this.rig.camera.position);
+    if (events.length) this.combatRenderer.onEvents(events);
+    this.shipModel.setShieldLevel(this.combat.playerMaxShield > 0 ? this.combat.playerShield / this.combat.playerMaxShield : 0);
+    const hr = s.hull / Math.max(1, s.maxHull);
+    if (Math.abs(hr - this.lastHullRatio) > 0.01) {
+      this.lastHullRatio = hr;
+      this.shipModel.setDamage(hr);
+    }
+  }
+
+  private spawnContractEncounter(id: string): void {
+    const s = this.ship;
+    const around = { x: s.x, y: s.y, z: s.z };
+    const opts = { difficulty: this.planetDef.danger, upgradeLevels: upgradeSum(this.levels) };
+    if (id === "escort_ambush") {
+      const f = s.forward();
+      const start = { x: s.x + f.x * 160, y: Math.max(s.y, this.planet.groundAt(s.x, s.z) + 120), z: s.z + f.z * 160 };
+      const path = [1, 2, 3].map((k) => ({ x: start.x + f.x * 380 * k, y: start.y, z: start.z + f.z * 380 * k }));
+      this.combat.removeAlly("freighter");
+      this.combat.addAlly({ id: "freighter", kind: "freighter", position: start, path, hull: 320, shield: 140, name: "Lantern freighter" });
+      this.combat.spawnEncounter(id, start, opts);
+    } else if (id.startsWith("station_defense")) {
+      const st = WORLD.station.position;
+      if (!this.combat.ally("halcyon")) this.combat.addAlly({ id: "halcyon", kind: "station", position: { x: st.x, y: st.y, z: st.z }, hull: 1800, shield: 700, name: "Halcyon Dock" });
+      this.combat.spawnEncounter(id, { x: st.x, y: st.y, z: st.z }, opts);
+    } else this.combat.spawnEncounter(id, around, opts);
+    this.contracts.markSpawned();
+    this.hud.toast(id === "dreadnought_boss" ? "Warning: capital-class signature closing" : "Hostile contacts on scope", "warn");
+  }
+
+  private handleCombatEvents(events: CombatEvent[]): void {
+    const pid = this.planetId;
+    for (const e of events) {
+      switch (e.type) {
+        case "playerFired":
+          this.combatStats.shots++;
+          this.shipModel.muzzleFlash(e.gun);
+          break;
+        case "playerShieldHit":
+          this.shipModel.shieldHit(new Vector3(e.point.x, e.point.y, e.point.z), Math.min(1, e.absorbed / 20));
+          break;
+        case "playerShieldDown":
+          this.toastOnce("shielddown", "Shields down!", "bad", 4);
+          break;
+        case "playerHullDamage":
+          this.ship.hull = Math.max(0, this.ship.hull - e.amount);
+          this.hud.toast(`Hull −${Math.round(e.amount)}`, "bad");
+          this.hud.flashDamage(Math.min(1, e.amount / 25));
+          break;
+        case "enemyHit":
+        case "enemyShieldHit":
+          this.combatStats.hits++;
+          break;
+        case "enemyDestroyed": {
+          this.combatStats.kills++;
+          const parts: string[] = [];
+          for (const [id, n] of Object.entries(e.loot) as [ResourceId, number][]) {
+            const got = this.inventory.add(id, n);
+            if (got > 0) parts.push(`+${got} ${RESOURCES[id].name}`);
+          }
+          this.hud.toast(`${ENEMY_TYPES[e.enemyType].name} destroyed${parts.length ? ` · ${parts.join(" · ")}` : ""} · +${e.xp} XP`, "good");
+          this.progress({ type: "xp", amount: e.xp });
+          this.progress({ type: "kill", enemy: e.enemyType });
+          this.contractEvent({ type: "destroyed", planet: pid, enemy: e.enemyType });
+          break;
+        }
+        case "hardpointDestroyed":
+          this.progress({ type: "xp", amount: e.xp });
+          this.hud.toast(`Weapon hardpoint destroyed (+${e.xp} XP)`, "good");
+          break;
+        case "bossPhase":
+          this.hud.toast(`Dreadnought phase ${e.phase}`, "warn");
+          break;
+        case "bossLaunch":
+          this.hud.toast("The dreadnought launches fighters!", "bad");
+          break;
+        case "targetLocked":
+          this.toastOnce("lock", "Target locked", "info", 2);
+          break;
+        case "allyDestroyed":
+          this.hud.toast("Allied vessel destroyed", "bad");
+          {
+            const o = this.contracts.objective;
+            this.contractEvent({ type: "allyLost", encounter: o && (o.kind === "escort" || o.kind === "clear") ? o.encounter : "" });
+          }
+          break;
+        case "encounterCleared":
+          this.hud.toast("Area clear", "good");
+          this.contractEvent({ type: "cleared", planet: pid, encounter: e.encounter });
+          break;
+      }
+    }
+    if (this.ship.hull <= 0 && this.ship.state === "flying") this.onShipEvent({ type: "destroyed" });
   }
 
   private applyDepositState(): void {
@@ -1325,7 +1511,9 @@ export class Game {
 
   /** Extra warp interlocks (combat). */
   private warpBlockedReason(): string | null {
-    return null;
+    const s = this.ship;
+    const near = this.combat.enemies().some((e) => e.alive && ["detect", "pursue", "attack"].includes(e.state) && Math.hypot(e.pos.x - s.x, e.pos.y - s.y, e.pos.z - s.z) < 700);
+    return near ? "Warp drive offline: hostile ships are on your tail. Destroy or outrun them first." : null;
   }
 
   startWarp(target: PlanetId): boolean {
@@ -1381,8 +1569,7 @@ export class Game {
 
   /** Visual hook for the warp effect (graphics integration). */
   private onWarpPhase(phase: "idle" | "spool" | "tunnel" | "exit", t: number): void {
-    void phase;
-    void t;
+    this.warpFx.setPhase(phase, t);
   }
 
   /** Swaps the world and drops the ship out of warp at the planet's arrival point. */
@@ -1412,7 +1599,10 @@ export class Game {
 
   /** Combat integration spawns arrival encounters here. */
   private onFirstArrival(first: boolean): void {
-    void first;
+    const table = this.planetDef.encounters;
+    if (!first || !table.arrival || this.contracts.pendingSpawn(this.planetId, true)) return;
+    const s = this.ship;
+    this.combat.spawnArrival(table, { x: s.x, y: s.y, z: s.z }, this.planetDef.danger, upgradeSum(this.levels));
   }
 
   /** Instant warp for tests and debugging (same code path minus the effect timing). */
@@ -1477,6 +1667,8 @@ export class Game {
 
   private shipLost(): void {
     this.hud.toast("Hull critical — emergency recall to Halcyon Dock", "bad");
+    this.combat.clear();
+    this.combat.playerShield = this.combat.playerMaxShield;
     this.contractEvent({ type: "shipLost" });
     if (this.planetId !== "veyra7") this.swapPlanet("veyra7");
     this.ship.placeDocked(this.shipEnv);
@@ -1630,6 +1822,16 @@ export class Game {
         tagged: g.tagged.size,
         target: g.currentTarget?.id ?? null,
         planet: g.planetId,
+        combat: {
+          enemies: g.combat.enemies().filter((e) => e.alive).map((e) => ({ id: e.id, type: e.type, name: ENEMY_TYPES[e.type].name, state: e.state, x: e.pos.x, y: e.pos.y, z: e.pos.z })),
+          shield: g.combat.playerShield,
+          maxShield: g.combat.playerMaxShield,
+          heat: g.combat.playerHeat,
+          shotsFired: g.combatStats.shots,
+          hitsLanded: g.combatStats.hits,
+          kills: g.combatStats.kills,
+          projectiles: g.combat.projectiles().length,
+        },
         warping: g.warp ? g.warp.phase : null,
         contract: g.contracts.summary(),
         contractsCompleted: [...g.contracts.state.completed],
@@ -1674,6 +1876,17 @@ export class Game {
       },
       save: () => g.save(),
       warpNow: (id: PlanetId) => g.warpNow(id),
+      /** Test helper: point the Wayfarer's nose at the locked/nearest hostile (mouse aiming is impractical at 2 fps). */
+      aimAtTarget: () => {
+        const tgt = g.combat.target();
+        const e = tgt?.enemy ?? g.combat.enemies().find((x) => x.alive);
+        if (!e) return false;
+        const dx = e.pos.x - g.ship.x, dy = e.pos.y - g.ship.y, dz = e.pos.z - g.ship.z;
+        g.ship.yaw = Math.atan2(dx, dz);
+        g.ship.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+        return true;
+      },
+      spawnEncounter: (id: string) => g.spawnContractEncounter(id),
       startWarp: (id: PlanetId) => g.startWarp(id),
     };
   }
@@ -1684,6 +1897,10 @@ export class Game {
     for (const c of this.cleanup) c();
     this.input.dispose();
     this.orientation.dispose();
+    this.combatHud?.dispose();
+    this.combatRenderer?.dispose();
+    this.warpFx?.dispose();
+    this.space?.dispose();
     this.renderer?.dispose();
     this.engine.stopRenderLoop();
     this.planet?.dispose();

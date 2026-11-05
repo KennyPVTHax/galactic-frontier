@@ -110,7 +110,7 @@ test("progression ranks, achievements and cosmetic unlocks", () => {
   const k = p.handle({ type: "kill", enemy: "interceptor" });
   assert.ok(k.achievements.some((a) => a.id === "first_blood"));
   assert.ok(unlockedPaints(p.state).includes("ember"));
-  assert.equal(p.setPaint("aurora"), false, "locked paint rejected");
+  assert.equal(p.setPaint("solstice"), false, "locked paint rejected");
   assert.equal(p.setPaint("ember"), true);
   const r = p.handle({ type: "xp", amount: 200 });
   assert.equal(r.rankUp, RANKS[1].title);
@@ -122,12 +122,12 @@ test("progression ranks, achievements and cosmetic unlocks", () => {
   assert.ok(rankOf(1e9).next === null);
   assert.equal(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
   // Sanitize drops junk and locked paint.
-  const s = Progression.sanitize({ xp: -5, kills: { scout: 3, bogus: 9 }, visited: ["kryos", "nowhere"], achievements: ["fake"], paint: "aurora" });
+  const s = Progression.sanitize({ xp: -5, kills: { scout: 3, bogus: 9 }, visited: ["kryos", "nowhere"], achievements: ["fake"], paint: "solstice" });
   assert.equal(s.xp, 0);
   assert.equal(s.kills.scout, 3);
   assert.deepEqual(s.visited, ["veyra7", "kryos"]);
   assert.deepEqual(s.achievements, []);
-  assert.equal(s.paint, "factory");
+  assert.equal(s.paint, "wayfarer");
 });
 
 test("suit integrity drains in hazards, warns, fails once and recovers when sheltered", () => {

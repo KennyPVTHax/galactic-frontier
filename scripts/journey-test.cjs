@@ -98,7 +98,7 @@ const until = (p, fn, arg, timeout = 90000) => p.waitForFunction(fn, arg, { time
 
   // 9a Shields take hits before the hull.
   const before = await st(page);
-  await until(page, (sh) => window.__GF.state().combat.shield < sh - 0.5 || window.__GF.state().ship.hull < window.__GF.state().ship.maxHull ?? 100, before.combat.shield, 90000).catch(() => undefined);
+  await until(page, (b0) => { const g = window.__GF.state(); return g.combat.shield < b0.shield - 0.5 || g.ship.hull < b0.hull - 0.5; }, { shield: before.combat.shield, hull: before.ship.hull }, 90000).catch(() => undefined);
   const hit = await st(page);
   check(9, "enemy fire drains the player's shield (then hull)", hit.combat.shield < before.combat.shield || hit.ship.hull < before.ship.hull, `shield ${before.combat.shield.toFixed(0)} → ${hit.combat.shield.toFixed(0)}, hull ${before.ship.hull.toFixed(0)} → ${hit.ship.hull.toFixed(0)}`);
   await shot("09-under-fire.png");
