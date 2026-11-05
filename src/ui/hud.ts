@@ -6,6 +6,7 @@ import { MISSION_REQUIREMENTS } from "../gameplay/mission";
 import { UPGRADES, nextCost, type UpgradeId, type UpgradeLevels } from "../gameplay/upgrades";
 import type { GameSettings } from "../persistence/saveSystem";
 import { hudCss } from "./styles";
+import { frontierCss } from "./frontierUi";
 import type { DevicePrefs } from "../persistence/devicePrefs";
 import { PROFILES, type GraphicsTier } from "../graphics/profiles";
 
@@ -37,13 +38,15 @@ export interface HudHandlers {
   onDismissRotate(): void;
 }
 
-export type PanelId = "inventory" | "terminal" | "settings" | "complete";
+export type PanelId = "inventory" | "terminal" | "settings" | "complete" | "starmap" | "frontier";
 export type HudMode = "foot" | "flight" | "parked";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 const ICON_BAG = `<svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>`;
 const ICON_FS = `<svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>`;
+const ICON_MAP = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="7" r="1.6"/><circle cx="18.5" cy="6" r="1.3"/><circle cx="17" cy="18" r="1.8"/><path d="M6.4 7.8l3.6 2.8M14.3 11l3.3-4M13.8 13.8l2 2.6"/></svg>`;
+const ICON_LOG = `<svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>`;
 const ICON_GEAR = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>`;
 
 export class Hud {
@@ -54,6 +57,9 @@ export class Hud {
   private styleEl: HTMLStyleElement;
   private openPanelId: PanelId | null = null;
   private terminalTab: "upgrades" | "expedition" = "expedition";
+  private missionHtml = "";
+  private contractHtml = "";
+  private missionCollapsed = false;
   private last: Record<string, string> = {};
 
   constructor(
@@ -61,7 +67,7 @@ export class Hud {
     private readonly theme: Theme,
   ) {
     this.styleEl = document.createElement("style");
-    this.styleEl.textContent = hudCss(theme);
+    this.styleEl.textContent = hudCss(theme) + frontierCss(theme);
     document.head.appendChild(this.styleEl);
 
     const root = document.createElement("div");
@@ -77,6 +83,8 @@ export class Hud {
       <div class="gf-topright">
         <div class="gf-iconrow">
           <button class="gf-ibtn gf-hidden" data-fs title="Full screen">${ICON_FS}</button>
+          <button class="gf-ibtn" data-act="starmap" title="Star map (M)">${ICON_MAP}</button>
+          <button class="gf-ibtn" data-act="frontier" title="Contracts & pilot log (J)">${ICON_LOG}</button>
           <button class="gf-ibtn" data-act="inventory" title="Inventory (Tab)">${ICON_BAG}</button>
           <button class="gf-ibtn" data-act="settings" title="Settings (Esc)">${ICON_GEAR}</button>
         </div>
@@ -90,6 +98,7 @@ export class Hud {
             <div class="gf-bar" data-el="b-energy"><div class="gf-label">Laser energy</div><div class="track"><div class="fill" style="background:${theme.accent2}"></div></div></div>
             <div class="gf-bar" data-el="b-heat"><div class="gf-label">Heat</div><div class="track"><div class="fill" style="background:${theme.warn}"></div></div></div>
             <div class="gf-bar" data-el="b-jet"><div class="gf-label">Jetpack</div><div class="track"><div class="fill" style="background:${theme.accent}"></div></div></div>
+            <div class="gf-bar gf-suit gf-hidden" data-el="b-suit"><div class="gf-label">Suit</div><div class="track"><div class="fill" style="background:${theme.accent2}"></div></div></div>
           </div>
         </div>
         <div class="gf-card gf-hidden" data-el="shipbars" style="width:100%">
@@ -104,6 +113,7 @@ export class Hud {
       </div>
       </div>
       <div class="gf-rotate gf-hidden" data-el="rotate"><div class="gf-phone"></div><b>Rotate your device</b><span>Galactic Frontier plays in landscape.</span><button class="gf-btn ghost" data-portrait>Play in portrait</button></div>
+      <div class="gf-warp" data-el="warp"><div><b data-el="warptitle"></b><span data-el="warpsub"></span></div></div>
       <div class="gf-panelwrap" data-el="panelwrap"><div class="gf-panel gf-card" data-el="panel"></div></div>
       <div class="gf-title gf-hidden" data-el="title"></div>
       <div class="gf-loading" data-el="loading"><div data-el="loadtext">Preparing expedition…</div><div class="track"><i data-el="loadbar"></i></div></div>
@@ -192,7 +202,47 @@ export class Hud {
     const prog = obj.progress
       ? `<div class="gf-prog">${obj.progress.map((p) => `<div><span>${esc(p.label)}</span><b>${p.current} / ${p.target}</b></div>`).join("")}</div>`
       : "";
-    this.set("mission", `<div class="gf-label">Expedition I · First Light</div><div class="gf-steps">${steps}</div><h3>${esc(obj.title)}</h3><p>${esc(obj.detail)}</p>${prog}`, this.el.mission);
+    this.missionHtml = `<div class="gf-label">Expedition I · First Light</div><div class="gf-steps">${steps}</div><h3>${esc(obj.title)}</h3><p>${esc(obj.detail)}</p>${prog}`;
+    this.renderMissionCard();
+  }
+
+  /** Shows only the frontier contract (after First Light is complete the expedition card collapses). */
+  setMissionCollapsed(collapsed: boolean): void {
+    if (this.missionCollapsed === collapsed) return;
+    this.missionCollapsed = collapsed;
+    this.renderMissionCard();
+  }
+
+  /** M6: secondary objective line for the active frontier contract. */
+  setContract(c: { contract: string; title: string; detail: string; current: number; target: number; step: number; steps: number } | null): void {
+    this.contractHtml = c
+      ? `<div class="gf-contract"><div class="gf-label">Contract · ${esc(c.contract)} · ${c.step + 1}/${c.steps}</div><h4>${esc(c.title)}${c.target > 1 ? ` <b>${c.current} / ${c.target}</b>` : ""}</h4><p>${esc(c.detail)}</p></div>`
+      : "";
+    this.renderMissionCard();
+  }
+
+  private renderMissionCard(): void {
+    const main = this.missionCollapsed && this.contractHtml ? "" : this.missionHtml;
+    this.set("mission", main + this.contractHtml, this.el.mission);
+  }
+
+  /** M4: suit integrity under environmental hazards (null hides the bar). */
+  setSuit(ratio: number | null, label = "Suit"): void {
+    const el = this.el["b-suit"];
+    this.show(el, ratio !== null);
+    if (ratio === null) return;
+    (el.querySelector(".fill") as HTMLElement).style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
+    (el.querySelector(".fill") as HTMLElement).style.background = ratio < 0.35 ? this.theme.danger : this.theme.accent2;
+    this.set("suitlabel", esc(label), el.querySelector(".gf-label") as HTMLElement);
+  }
+
+  /** M4: warp transition overlay. phase null hides it. */
+  setWarp(phase: "spool" | "tunnel" | "flash" | null, title = "", sub = ""): void {
+    const w = this.el.warp;
+    w.classList.toggle("on", phase !== null);
+    w.classList.toggle("flash", phase === "flash");
+    this.set("warptitle", esc(title), this.el.warptitle);
+    this.set("warpsub", esc(sub), this.el.warpsub);
   }
 
   setBars(energy: number, heat: number, overheated: boolean, jet: number): void {
@@ -356,9 +406,17 @@ export class Hud {
 
   private openWith(id: PanelId, html: string): void {
     this.openPanelId = id;
+    this.el.panel.classList.remove("gf-wide");
     this.el.panel.innerHTML = html;
     this.el.panelwrap.classList.add("open");
     this.el.panel.querySelector(".gf-x")?.addEventListener("click", () => this.handlers?.onClosePanel());
+  }
+
+  /** Opens a panel with caller-rendered HTML (star map, frontier log). Returns the panel element for binding. */
+  showCustom(id: PanelId, html: string, wide = false): HTMLElement {
+    this.openWith(id, html);
+    this.el.panel.classList.toggle("gf-wide", wide);
+    return this.el.panel;
   }
 
   showInventory(c: InventoryCounts, capacity: number, levels: UpgradeLevels): void {
@@ -411,12 +469,13 @@ export class Hud {
       `<header><h2>Halcyon Dock Terminal</h2><button class="gf-x" aria-label="Close">✕</button></header>
        <div class="gf-tabs"><button class="gf-tab ${this.terminalTab === "expedition" ? "on" : ""}" data-tab="expedition">Expedition</button><button class="gf-tab ${this.terminalTab === "upgrades" ? "on" : ""}" data-tab="upgrades">Upgrades</button></div>
        <div>${this.terminalTab === "upgrades" ? upgrades : exp}</div>
-       <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px"><button class="gf-btn cy" data-launch>Launch ship</button></div>`,
+       <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="gf-btn ghost" data-open="frontier">Contracts</button><button class="gf-btn ghost" data-open="starmap">Star map</button><button class="gf-btn cy" data-launch>Launch ship</button></div>`,
     );
     const p = this.el.panel;
     p.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) =>
       b.addEventListener("click", () => this.showTerminal(c, levels, mission, b.dataset.tab as "upgrades" | "expedition")),
     );
+    p.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((b) => b.addEventListener("click", () => this.handlers?.onOpenPanel(b.dataset.open as PanelId)));
     p.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((b) => b.addEventListener("click", () => this.handlers?.onBuy(b.dataset.buy as UpgradeId)));
     p.querySelector("[data-deliver]")?.addEventListener("click", () => this.handlers?.onDeliver());
     p.querySelector("[data-launch]")?.addEventListener("click", () => this.handlers?.onLaunch());

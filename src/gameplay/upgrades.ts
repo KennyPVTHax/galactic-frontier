@@ -2,7 +2,7 @@ import { BASE_LASER, type LaserStats } from "./miningLaser";
 import type { Inventory } from "./inventory";
 import type { ResourceCost } from "./resources";
 
-export type UpgradeId = "laserCooling" | "laserYield" | "battery" | "jetpack" | "cargo" | "scanner" | "hull";
+export type UpgradeId = "laserCooling" | "laserYield" | "battery" | "jetpack" | "cargo" | "scanner" | "hull" | "shield" | "weapons" | "engine";
 
 export interface UpgradeDef {
   id: UpgradeId;
@@ -64,12 +64,34 @@ export const UPGRADES: UpgradeDef[] = [
     costs: [{ ferrite: 60 }, { ferrite: 120, carbon: 40 }],
     effects: ["100 hull", "150 hull", "200 hull"],
   },
+  // M5/M6 ship systems.
+  {
+    id: "shield",
+    name: "Aegis Emitter",
+    description: "Stronger deflector shield that recovers sooner after a hit.",
+    costs: [{ ferrite: 40, lumenite: 20 }, { lumenite: 50, carbon: 30 }, { lumenite: 80, voidQuartz: 4 }],
+    effects: ["60 shield", "90 shield", "125 shield", "170 shield"],
+  },
+  {
+    id: "weapons",
+    name: "Pulse Capacitors",
+    description: "Harder-hitting, faster-cycling pulse cannons.",
+    costs: [{ ferrite: 40, carbon: 20 }, { ferrite: 70, lumenite: 30 }, { ferrite: 100, voidQuartz: 5 }],
+    effects: ["Damage ×1.00", "Damage ×1.25", "Damage ×1.55", "Damage ×1.90"],
+  },
+  {
+    id: "engine",
+    name: "Drive Tuning",
+    description: "Higher cruise and boost speed for the Wayfarer.",
+    costs: [{ carbon: 30, ferrite: 20 }, { carbon: 60, lumenite: 30 }, { carbon: 90, voidQuartz: 4 }],
+    effects: ["Speed ×1.00", "Speed ×1.10", "Speed ×1.20", "Speed ×1.32"],
+  },
 ];
 
 export type UpgradeLevels = Record<UpgradeId, number>;
 
 export function emptyLevels(): UpgradeLevels {
-  return { laserCooling: 0, laserYield: 0, battery: 0, jetpack: 0, cargo: 0, scanner: 0, hull: 0 };
+  return { laserCooling: 0, laserYield: 0, battery: 0, jetpack: 0, cargo: 0, scanner: 0, hull: 0, shield: 0, weapons: 0, engine: 0 };
 }
 
 export function getUpgrade(id: UpgradeId): UpgradeDef {
@@ -103,6 +125,12 @@ export interface DerivedStats {
   cargoCapacity: number;
   scanRadius: number;
   maxHull: number;
+  /** Deflector shield (M5). */
+  shield: { max: number; regenPerSec: number; regenDelay: number };
+  /** Pulse cannon multipliers (M5). */
+  weapon: { damageScale: number; intervalScale: number };
+  /** Flight speed multiplier (M6). */
+  speedScale: number;
 }
 
 const pick = (arr: number[], lvl: number) => arr[Math.max(0, Math.min(arr.length - 1, lvl))];
@@ -122,6 +150,13 @@ export function deriveStats(levels: UpgradeLevels): DerivedStats {
     cargoCapacity: pick([250, 400, 600, 1000], levels.cargo),
     scanRadius: pick([120, 165, 215, 270], levels.scanner),
     maxHull: pick([100, 150, 200], levels.hull),
+    shield: {
+      max: pick([60, 90, 125, 170], levels.shield),
+      regenPerSec: pick([8, 11, 14, 18], levels.shield),
+      regenDelay: pick([3.5, 3, 2.6, 2.2], levels.shield),
+    },
+    weapon: { damageScale: pick([1, 1.25, 1.55, 1.9], levels.weapons), intervalScale: pick([1, 0.9, 0.8, 0.7], levels.weapons) },
+    speedScale: pick([1, 1.1, 1.2, 1.32], levels.engine),
   };
 }
 

@@ -17,6 +17,10 @@ export interface InputFrame {
   interactPressed: boolean;
   inventoryPressed: boolean;
   menuPressed: boolean;
+  /** M5/M6: star map (M), cycle combat target (T / touch Target), contracts & pilot log (J). */
+  mapPressed: boolean;
+  targetPressed: boolean;
+  contractsPressed: boolean;
   // Ship
   shipThrottle: number;
   shipYaw: number;
@@ -231,6 +235,9 @@ export class InputManager {
         <button data-b="liftUp" class="gf-tb" data-pos="up">Up</button>
         <button data-b="thrDown" class="gf-tb gf-tb-big" data-pos="thrdown">Thr −</button>
         <button data-b="thrUp" class="gf-tb gf-tb-big" data-pos="thrup">Thr +</button>
+        <button data-b="fire" class="gf-tb gf-tb-big gf-tb-fire" data-pos="sfire">Fire</button>
+        <button data-b="target" class="gf-tb" data-pos="starget">Target</button>
+        <button data-b="map" class="gf-tb" data-pos="smap">Map</button>
         <div class="gf-thr" data-pos="thr" aria-label="Throttle"><div class="gf-thr-track"><div class="gf-thr-fill"></div></div><span class="gf-thr-label">0%</span></div>
       </div>`;
     this.overlay.appendChild(root);
@@ -437,6 +444,9 @@ export class InputManager {
       interactPressed: this.p("KeyE") || tp("interact"),
       inventoryPressed: this.p("Tab", "KeyI"),
       menuPressed: this.p("Escape", "KeyP"),
+      mapPressed: this.p("KeyM") || tp("map"),
+      targetPressed: !ui && (this.p("KeyT") || tp("target")),
+      contractsPressed: this.p("KeyJ"),
       shipThrottle: ui ? 0 : clamp1(shipThrottle),
       shipYaw: ui ? 0 : clamp1(shipYaw),
       shipPitch: ui ? 0 : clamp1(shipPitch),

@@ -27,6 +27,10 @@ export class Player {
   jetFuel = 100;
   maxJetFuel = 100;
   jetThrust = 25;
+  /** Per-planet surface rules (M4); defaults are Veyra-7. */
+  liquidLevel: number = WORLD.liquidLevel;
+  gravity: number = WORLD.gravity;
+  walkRadius: number = WORLD.walkRadius;
   private sinceJump = 99;
   private groundedTime = 0;
   /** Extra colliders (e.g. the parked ship). */
@@ -67,7 +71,7 @@ export class Player {
     }
     const ny = world.normalYAt(this.position.x, this.position.z);
     const slopeFactor = clamp((ny - 0.55) / 0.3, 0.3, 1);
-    const wading = world.groundAt(this.position.x, this.position.z) < WORLD.liquidLevel ? 0.55 : 1;
+    const wading = world.groundAt(this.position.x, this.position.z) < this.liquidLevel ? 0.55 : 1;
     const speed = (input.sprint && !aiming ? SPRINT : WALK) * slopeFactor * wading;
     const accel = this.grounded ? 45 : 9;
     const tvx = mx * speed;
@@ -91,7 +95,7 @@ export class Player {
       this.velocity.x += mx * 6 * dt;
       this.velocity.z += mz * 6 * dt;
     }
-    this.velocity.y -= WORLD.gravity * dt;
+    this.velocity.y -= this.gravity * dt;
 
     const ox = this.position.x, oz = this.position.z;
     this.position.x += this.velocity.x * dt;
@@ -114,9 +118,9 @@ export class Player {
 
     // Soft world boundary
     const r = Math.hypot(this.position.x, this.position.z);
-    if (r > WORLD.walkRadius) {
-      this.position.x *= WORLD.walkRadius / r;
-      this.position.z *= WORLD.walkRadius / r;
+    if (r > this.walkRadius) {
+      this.position.x *= this.walkRadius / r;
+      this.position.z *= this.walkRadius / r;
     }
 
     // Ground

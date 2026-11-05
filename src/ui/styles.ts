@@ -178,6 +178,9 @@ export function hudCss(t: Theme): string {
 .gf-hud.gf-landscape [data-pos=up]{--s:1;--r:3.2;--b:1.5}
 .gf-hud.gf-landscape [data-pos=down]{--s:1;--r:3.2;--b:.3}
 .gf-hud.gf-landscape [data-pos=suse]{--s:1.1;--r:.4;--b:4.2}
+.gf-hud.gf-landscape [data-pos=sfire]{--s:1.35;--r:3.05;--b:2.75;font-size:13px}
+.gf-hud.gf-landscape [data-pos=starget]{--s:1;--r:4.65;--b:.3;font-size:11px}
+.gf-hud.gf-landscape [data-pos=smap]{--s:1;--r:4.65;--b:1.5;font-size:11px}
 .gf-hud.gf-landscape .gf-joyzone{width:45%;height:72%}
 .gf-hud.gf-landscape .gf-lookzone{width:55%;top:calc(80px + var(--sat))}
 .gf-hud.gf-landscape .gf-joy{width:calc(var(--u)*2.1);height:calc(var(--u)*2.1);margin:calc(var(--u)*-1.05) 0 0 calc(var(--u)*-1.05);left:calc(var(--sal) + var(--u)*1.9);top:calc(100% - var(--sab) - var(--u)*1.75)}

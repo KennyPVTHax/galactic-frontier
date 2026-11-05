@@ -30,12 +30,23 @@ import {
   type SaveData,
 } from "../persistence/saveSystem";
 import { OfflineBackend, buildCompletionReport, type BackendClient, type MissionSubmissionResult } from "../integration/backend";
+import { PLANETS, getPlanet } from "../universe/planets";
+import { PLANET_IDS, type PlanetDef, type PlanetId, type PoiKind } from "../universe/types";
+import { Progression, type ProgressEvent } from "../gameplay/progression";
+import { ContractBoard, type ContractEvent } from "../gameplay/contracts";
+import { SuitIntegrity, hazardLabel } from "../gameplay/hazards";
+import { starMapHtml, bindStarMap, frontierHtml, bindFrontier } from "../ui/frontierUi";
+import { RESOURCE_IDS as ALL_RESOURCES } from "../gameplay/resources";
+import type { SkyColors } from "../world/sky";
+import type { WorldLighting } from "../graphics/renderer";
 
 export type GameOutEvent =
   | { type: "ready"; quality: QualityLevel; tier: GraphicsTier }
   | { type: "missionStep"; step: string }
   | { type: "missionComplete"; result: MissionSubmissionResult }
   | { type: "saved"; at: number }
+  | { type: "warp"; from: PlanetId; to: PlanetId }
+  | { type: "contractComplete"; id: string }
   | { type: "contextLost" }
   | { type: "error"; message: string };
 
@@ -61,6 +72,11 @@ export interface GameOptions {
 type Mode = "title" | "onFoot" | "ship";
 
 const MISSION_WAYPOINT_COLOR = "#ffd37a";
+const CONTRACT_WAYPOINT_COLOR = "#7affc4";
+/** Warp timing (seconds of game time). */
+const WARP_SPOOL = 1.6;
+const WARP_TUNNEL = 1.5;
+const WARP_EXIT = 0.45;
 
 export class Game {
   readonly theme: Theme;
@@ -124,6 +140,23 @@ export class Game {
   private cleanup: (() => void)[] = [];
   private lastStep = "";
   private submitting = false;
+
+  // ---- M4–M6 state
+  planetDef: PlanetDef = getPlanet("veyra7");
+  progression = new Progression();
+  contracts = new ContractBoard();
+  suit = new SuitIntegrity();
+  private arrivals = new Set<PlanetId>();
+  /** Deposit state for every planet (runtime ids are unique across planets). */
+  private depletedAll: Record<string, number> = {};
+  private partialAll: Record<string, number> = {};
+  private warp: { from: PlanetId; target: PlanetId; t: number; phase: "spool" | "tunnel" | "exit"; swapped: boolean; fromDock: boolean } | null = null;
+  private starMapSel: PlanetId | null = null;
+  private frontierTab: "contracts" | "pilot" = "contracts";
+
+  get planetId(): PlanetId {
+    return this.planetDef.id;
+  }
 
   constructor(private readonly opts: GameOptions) {
     this.theme = { ...DEFAULT_THEME, ...(opts.theme ?? {}) };
@@ -276,6 +309,7 @@ export class Game {
       flightRadius: WORLD.flightRadius,
       maxAltitude: WORLD.maxAltitude,
     };
+    this.bindPlanetGameplay();
     this.ship.placeDocked(this.shipEnv);
     this.syncShipModel(0);
     this.player.model.setVisible(false);
@@ -346,6 +380,7 @@ export class Game {
     void this.orientation.enter();
     const data = save ?? newGameSave();
     if (!save) data.settings = { ...this.settings };
+    if (data.universe.planet !== this.planetId) this.swapPlanet(data.universe.planet, data.depleted, data.partial);
     this.applySave(data);
     this.hud.hideTitle();
     this.hud.root.classList.remove("title");
@@ -378,21 +413,14 @@ export class Game {
     this.mission = new IntroMission(s.mission);
     this.discovered = new Set(s.discoveredPois);
     this.looted = new Set(s.lootedPois);
-    const now = Date.now();
-    for (const d of this.planet.deposits) {
-      const dep = s.depleted[d.id];
-      if (dep !== undefined && now - dep < WORLD.depositRegrowMs) {
-        d.amount = 0;
-        d.depletedAt = dep;
-      } else if (s.partial[d.id] !== undefined) {
-        d.amount = Math.max(1, Math.round(d.max * clamp(s.partial[d.id], 0, 1)));
-        d.depletedAt = null;
-      } else {
-        d.amount = d.max;
-        d.depletedAt = null;
-      }
-      this.planet.refreshDeposit(d);
-    }
+    this.depletedAll = { ...s.depleted };
+    this.partialAll = { ...s.partial };
+    this.applyDepositState();
+    this.progression = new Progression(s.progression);
+    this.contracts = new ContractBoard(s.contracts);
+    this.arrivals = new Set(s.universe.arrivals);
+    this.ship.speedScale = this.stats.speedScale;
+    this.suit.reset();
 
     if (s.ship.state === "landed") this.ship.placeLanded(this.shipEnv, s.ship.x, s.ship.z, s.ship.yaw);
     else this.ship.placeDocked(this.shipEnv);
@@ -410,12 +438,9 @@ export class Game {
   }
 
   snapshot(): SaveData {
-    const depleted: Record<string, number> = {};
-    const partial: Record<string, number> = {};
-    for (const d of this.planet.deposits) {
-      if (d.depletedAt !== null) depleted[d.id] = d.depletedAt;
-      else if (d.amount < d.max) partial[d.id] = d.amount / d.max;
-    }
+    this.captureDeposits();
+    const depleted: Record<string, number> = { ...this.depletedAll };
+    const partial: Record<string, number> = { ...this.partialAll };
     const shipState = this.ship.state === "landed" ? "landed" : this.ship.state === "docked" ? "docked" : "flying";
     return {
       version: newGameSave().version,
@@ -431,6 +456,9 @@ export class Game {
       discoveredPois: [...this.discovered],
       lootedPois: [...this.looted],
       settings: { ...this.settings },
+      universe: { planet: this.planetId, arrivals: [...this.arrivals] },
+      progression: JSON.parse(JSON.stringify(this.progression.state)),
+      contracts: JSON.parse(JSON.stringify(this.contracts.state)),
     };
   }
 
@@ -511,7 +539,7 @@ export class Game {
   }
 
   private update(dt: number): void {
-    const input = this.input.consume(dt);
+    let input = this.input.consume(dt);
     this.planet.update(dt, this.rig.camera.position);
     this.materials.update(dt);
     this.updateWind(dt);
@@ -527,7 +555,20 @@ export class Game {
       return;
     }
 
+    if (this.warp) {
+      this.updateWarp(dt);
+      input = blankInput(input);
+    }
+
     // Panels / menus
+    if (input.mapPressed && !this.warp) {
+      if (this.hud.panel === "starmap") this.closePanel();
+      else this.openPanel("starmap");
+    }
+    if (input.contractsPressed) {
+      if (this.hud.panel === "frontier") this.closePanel();
+      else this.openPanel("frontier");
+    }
     if (input.menuPressed) {
       if (this.hud.panel) this.closePanel();
       else this.openPanel("settings");
@@ -557,6 +598,8 @@ export class Game {
   // ------------------------------------------------------------------ on foot
 
   private updateFoot(dt: number, input: InputFrame): void {
+    this.updateSuit(dt, false);
+    if (this.mode !== "onFoot") return;
     this.rig.look(input.lookX, input.lookY);
     if (input.zoom) this.rig.zoom(input.zoom, 3, 12);
     const aiming = input.fire && !this.laser.overheated;
@@ -628,8 +671,11 @@ export class Game {
       if (got > 0) {
         parts.push(`+${got} ${RESOURCES[id].name}`);
         this.missionEvent({ type: "collected", resource: id, amount: got });
+        this.contractEvent({ type: "collected", planet: this.planetId, resource: id, amount: got });
       }
     }
+    this.progress({ type: "inspect" });
+    this.contractEvent({ type: "inspected", planet: this.planetId, poiKind: ((poi as unknown as { kind?: PoiKind }).kind ?? "monolith") as PoiKind });
     if (parts.length) setTimeout(() => this.hud.toast(parts.join(" · "), "good"), 600);
     void this.save();
   }
@@ -655,6 +701,8 @@ export class Game {
     for (const poi of this.planet.pois) if (Vector3.Distance(origin, poi.position) <= r) this.discover(poi);
     this.hud.toast(found ? `Scan complete: ${found} mineral signatures within ${r} m` : "Scan complete: no signatures nearby", found ? "good" : "info");
     this.missionEvent({ type: "scanned", found });
+    this.progress({ type: "scan", planet: this.planetId, found });
+    this.contractEvent({ type: "scanned", planet: this.planetId, found });
   }
 
   private findMiningTarget(touch: boolean): Deposit | null {
@@ -723,6 +771,7 @@ export class Game {
     if (stored <= 0) return;
     d.amount = Math.max(0, d.amount - stored);
     this.missionEvent({ type: "collected", resource: d.type, amount: stored });
+    this.contractEvent({ type: "collected", planet: this.planetId, resource: d.type, amount: stored });
     if (d.amount <= 0) {
       d.depletedAt = Date.now();
       this.tagged.delete(d.id);
@@ -734,6 +783,7 @@ export class Game {
   // ------------------------------------------------------------------ ship
 
   private updateShip(dt: number, input: InputFrame): void {
+    this.updateSuit(dt, true);
     const s = this.ship;
     const env = this.shipEnv;
     let controls: ShipControls = { throttle: 0, yaw: 0, pitch: 0, lift: 0, boost: false, aimYaw: 0, aimPitch: 0 };
@@ -823,8 +873,9 @@ export class Game {
         break;
       case "landed":
         this.hud.setMode("parked");
-        this.hud.toast(`Touchdown on ${WORLD.planetName}`, "good");
+        this.hud.toast(`Touchdown on ${this.planetDef.name}`, "good");
         this.missionEvent({ type: "landed" });
+        this.contractEvent({ type: "landed", planet: this.planetId });
         void this.save();
         break;
       case "tookOff":
@@ -835,6 +886,7 @@ export class Game {
         this.ship.hull = this.ship.maxHull;
         this.hud.toast(`Docked at ${WORLD.station.name}. Hull repaired.`, "good");
         this.missionEvent({ type: "docked" });
+        this.contractEvent({ type: "docked" });
         void this.save();
         if (this.mission.step === "deliver") this.openPanel("terminal");
         break;
@@ -845,11 +897,7 @@ export class Game {
         this.hud.toast("Edge of the survey zone", "warn");
         break;
       case "destroyed":
-        this.hud.toast("Hull critical — emergency recall to Halcyon Dock", "bad");
-        this.ship.placeDocked(this.shipEnv);
-        this.ship.hull = this.ship.maxHull;
-        this.hud.setMode("parked");
-        void this.save();
+        this.shipLost();
         break;
     }
   }
@@ -867,6 +915,8 @@ export class Game {
   // ------------------------------------------------------------------ mission
 
   private missionEvent(e: GameplayEvent): void {
+    // "First Light" is a Veyra-7 expedition: events on other worlds do not advance it.
+    if (this.planetId !== "veyra7") return;
     const advanced = this.mission.handle(e);
     if (advanced || e.type === "collected") this.refreshMissionHud();
     if (advanced && this.mission.step !== this.lastStep) {
@@ -880,6 +930,8 @@ export class Game {
   private refreshMissionHud(): void {
     const i = MISSION_STEPS.indexOf(this.mission.step);
     this.hud.setMission(this.mission.objective(), i, MISSION_STEPS.length);
+    this.hud.setContract(this.contracts.summary());
+    this.hud.setMissionCollapsed(this.mission.isComplete);
   }
 
   private deliver(): void {
@@ -926,6 +978,8 @@ export class Game {
       if (this.ship.state !== "docked") return this.closePanel();
       this.hud.showTerminal(this.inventory.snapshot(), this.levels, this.mission.state, this.mission.step === "deliver" ? "expedition" : undefined);
     } else if (p === "complete") this.hud.showComplete(this.mission.state);
+    else if (p === "starmap") this.openStarMap();
+    else if (p === "frontier") this.openFrontier();
   }
 
   private closePanel(): void {
@@ -982,6 +1036,8 @@ export class Game {
     this.player.jetThrust = this.stats.jetThrust;
     this.ship.maxHull = this.stats.maxHull;
     this.ship.hull = this.stats.maxHull;
+    this.ship.speedScale = this.stats.speedScale;
+    this.onStatsChanged();
     this.hud.toast(`${getUpgrade(id).name} installed (level ${r.level})`, "good");
     this.hud.showTerminal(this.inventory.snapshot(), this.levels, this.mission.state, "upgrades");
     void this.save();
@@ -1014,6 +1070,7 @@ export class Game {
 
   /** Stop orbit/chase cameras from clipping into the station hull and ring. */
   private keepCameraOutsideStation(): void {
+    if (!this.planetDef.hasStation) return;
     const c = this.rig.camera.position;
     const sc = WORLD.station.position;
     const min = WORLD.station.collisionRadius + 2;
@@ -1072,7 +1129,7 @@ export class Game {
       const s = this.ship;
       const alt = s.state === "docked" ? s.y - this.planet.groundAt(s.x, s.z) : Math.max(0, s.agl(this.shipEnv));
       const status =
-        s.state === "docked" ? `Docked · ${WORLD.station.name}` : s.state === "landed" ? `Landed · ${WORLD.planetName}` : s.state === "flying" ? (s.agl(this.shipEnv) < 18 && s.speed < 18 ? "Landing possible" : "In flight") : "Autopilot";
+        s.state === "docked" ? `Docked · ${WORLD.station.name}` : s.state === "landed" ? `Landed · ${this.planetDef.name}` : s.state === "flying" ? (s.agl(this.shipEnv) < 18 && s.speed < 18 ? "Landing possible" : "In flight") : "Autopilot";
       this.hud.setShip(s.speed, alt, s.throttle, s.hull / s.maxHull, status);
     }
     this.hud.setResources(this.inventory.snapshot(), this.inventory.capacity);
@@ -1111,6 +1168,8 @@ export class Game {
 
     const wp = this.waypoint();
     if (wp) add("wp", wp.pos, wp.label, MISSION_WAYPOINT_COLOR, true);
+    const cwp = this.contractWaypoint();
+    if (cwp && (!wp || Vector3.Distance(wp.pos, cwp.pos) > 30)) add("cwp", cwp.pos, cwp.label, CONTRACT_WAYPOINT_COLOR, true);
     if (foot && this.ship.state === "landed" && (!wp || wp.label !== WORLD.shipName)) {
       const sp = new Vector3(this.ship.x, this.ship.y + 3, this.ship.z);
       if (Vector3.Distance(sp, this.player.position) > 20) add("ship", sp, WORLD.shipName, "#7fe3ff");
@@ -1122,11 +1181,13 @@ export class Game {
     const cm: CompassMarker[] = [];
     const bearingTo = (p: Vector3) => Math.atan2(p.x - camPos.x, p.z - camPos.z);
     if (wp) cm.push({ bearing: bearingTo(wp.pos), color: MISSION_WAYPOINT_COLOR });
+    if (cwp) cm.push({ bearing: bearingTo(cwp.pos), color: CONTRACT_WAYPOINT_COLOR });
     if (foot && this.ship.state === "landed") cm.push({ bearing: bearingTo(new Vector3(this.ship.x, 0, this.ship.z)), color: "#7fe3ff" });
     this.hud.setCompass(yaw, cm);
   }
 
   private waypoint(): { pos: Vector3; label: string } | null {
+    if (this.planetId !== "veyra7") return null;
     const step = this.mission.step;
     const site = WORLD.surveySite;
     const pad = stationPadPosition();
@@ -1136,6 +1197,413 @@ export class Game {
     if (step === "dock" && this.mode === "onFoot") return { pos: new Vector3(this.ship.x, this.ship.y + 3, this.ship.z), label: WORLD.shipName };
     if ((step === "scan" || step === "mine") && this.mode === "ship" && this.ship.state === "flying") return { pos: new Vector3(site.x, this.planet.groundAt(site.x, site.z) + 4, site.z), label: site.name };
     return null;
+  }
+
+  // ------------------------------------------------------------------ universe (M4)
+
+  /** Planet values the integration reads; tolerant of planets without the M4 extras. */
+  private planetInfo(): { sky: SkyColors; lighting: WorldLighting; liquid: number; landingLiquid: number; hazardAt: (x: number, z: number) => number } {
+    const p = this.planet as Planet & Partial<{ skyColors: SkyColors; lighting: WorldLighting; liquidLevel: number; landingLiquidLevel: number; hazardAt(x: number, z: number): number }>;
+    const def = this.planetDef;
+    return {
+      sky: p.skyColors ?? SKY,
+      lighting: p.lighting ?? { sun: def.sky.sunScale, ambient: def.sky.ambientScale, fog: def.sky.fogScale },
+      liquid: p.liquidLevel ?? def.liquid.level,
+      landingLiquid: p.landingLiquidLevel ?? def.liquid.level,
+      hazardAt: (x, z) => (p.hazardAt ? p.hazardAt(x, z) : def.hazard.kind === "none" ? 0 : 0.5),
+    };
+  }
+
+  private createPlanet(def: PlanetDef): Planet {
+    return new (Planet as unknown as new (s: Scene, m: MaterialLibrary, d: PlanetDef) => Planet)(this.scene, this.materials, def);
+  }
+
+  /** Per-planet gameplay rules: landing liquid, bounds, gravity, station presence. */
+  private bindPlanetGameplay(): void {
+    const def = this.planetDef;
+    const info = this.planetInfo();
+    const env = this.shipEnv as { -readonly [K in keyof ShipEnvironment]: ShipEnvironment[K] };
+    env.liquidLevel = info.landingLiquid;
+    env.flightRadius = def.flightRadius;
+    env.maxAltitude = def.maxAltitude;
+    if (def.hasStation) {
+      env.padPosition = stationPadPosition();
+      env.stationCenter = WORLD.station.position;
+      env.stationRadius = WORLD.station.collisionRadius;
+    } else {
+      // No dock on this world: park the docking target far outside the flight volume.
+      env.padPosition = { x: 0, y: -1e5, z: 0 };
+      env.stationCenter = { x: 0, y: -1e5, z: 0 };
+      env.stationRadius = 0;
+    }
+    this.station.root.setEnabled(def.hasStation);
+    this.player.liquidLevel = info.liquid;
+    this.player.gravity = def.gravity;
+    this.player.walkRadius = def.walkRadius;
+  }
+
+  /** Replaces the current planet in the live scene (no reload). */
+  private swapPlanet(id: PlanetId, depleted?: Record<string, number>, partial?: Record<string, number>): void {
+    if (this.planetId === id && this.planet) return;
+    this.captureDeposits();
+    if (depleted) this.depletedAll = { ...depleted };
+    if (partial) this.partialAll = { ...partial };
+    this.tagged.clear();
+    this.currentTarget = null;
+    this.beam.hide();
+    this.onLeavePlanet();
+    this.planet.dispose();
+    this.planetDef = getPlanet(id);
+    this.planet = this.createPlanet(this.planetDef);
+    sunVector(this.planet.sunDirection);
+    const info = this.planetInfo();
+    this.renderer.setWorld({
+      sun: this.planet.sun,
+      ambient: this.planet.ambient,
+      skyMesh: this.planet.sky.mesh,
+      sky: { zenith: info.sky.zenith, horizon: info.sky.horizon, ground: info.sky.ground, sun: info.sky.sun, sunDir: this.planet.sunDirection },
+      lighting: info.lighting,
+    });
+    this.renderer.governor.enabled = this.prefs.adaptive;
+    this.bindPlanetGameplay();
+    this.applyDepositState();
+    this.onEnterPlanet();
+  }
+
+  /** Hook for systems that live per planet (combat, weather, space). */
+  private onLeavePlanet(): void {
+    /* filled in by later integrations */
+  }
+
+  private onEnterPlanet(): void {
+    /* filled in by later integrations */
+  }
+
+  private onStatsChanged(): void {
+    /* filled in by later integrations */
+  }
+
+  private applyDepositState(): void {
+    const now = Date.now();
+    for (const d of this.planet.deposits) {
+      const dep = this.depletedAll[d.id];
+      if (dep !== undefined && now - dep < WORLD.depositRegrowMs) {
+        d.amount = 0;
+        d.depletedAt = dep;
+      } else if (this.partialAll[d.id] !== undefined) {
+        d.amount = Math.max(1, Math.round(d.max * clamp(this.partialAll[d.id], 0, 1)));
+        d.depletedAt = null;
+      } else {
+        d.amount = d.max;
+        d.depletedAt = null;
+      }
+      this.planet.refreshDeposit(d);
+    }
+  }
+
+  /** Writes the current planet's deposit state into the system-wide maps. */
+  private captureDeposits(): void {
+    if (!this.planet) return;
+    for (const d of this.planet.deposits) {
+      delete this.depletedAll[d.id];
+      delete this.partialAll[d.id];
+      if (d.depletedAt !== null) this.depletedAll[d.id] = d.depletedAt;
+      else if (d.amount < d.max) this.partialAll[d.id] = d.amount / d.max;
+    }
+  }
+
+  canWarp(): { ok: boolean; reason?: string } {
+    if (this.warp) return { ok: false, reason: "Warp in progress" };
+    if (this.mode !== "ship") return { ok: false, reason: "Board the Wayfarer to use the warp drive." };
+    const st = this.ship.state;
+    if (st === "landed") return { ok: false, reason: "Take off before warping." };
+    if (st !== "flying" && st !== "docked") return { ok: false, reason: "Wait for the autopilot to finish." };
+    const blocked = this.warpBlockedReason();
+    if (blocked) return { ok: false, reason: blocked };
+    return { ok: true };
+  }
+
+  /** Extra warp interlocks (combat). */
+  private warpBlockedReason(): string | null {
+    return null;
+  }
+
+  startWarp(target: PlanetId): boolean {
+    if (target === this.planetId || !PLANET_IDS.includes(target)) return false;
+    const ok = this.canWarp();
+    if (!ok.ok) {
+      this.hud.toast(ok.reason ?? "Cannot warp now", "warn");
+      return false;
+    }
+    this.closePanel();
+    this.warp = { from: this.planetId, target, t: 0, phase: "spool", swapped: false, fromDock: this.ship.state === "docked" };
+    this.hud.setWarp("spool", `Warp · ${getPlanet(target).name}`, "Spooling drive");
+    this.hud.setMode("flight");
+    return true;
+  }
+
+  private updateWarp(dt: number): void {
+    const w = this.warp!;
+    w.t += dt;
+    const s = this.ship;
+    if (w.phase === "spool") {
+      if (s.state === "flying") s.throttle = Math.min(1, s.throttle + dt);
+      this.onWarpPhase("spool", Math.min(1, w.t / WARP_SPOOL));
+      if (w.t >= WARP_SPOOL) {
+        w.phase = "tunnel";
+        w.t = 0;
+        this.hud.setWarp("tunnel", `Warp · ${getPlanet(w.target).name}`, "In transit");
+      }
+      return;
+    }
+    if (w.phase === "tunnel") {
+      this.onWarpPhase("tunnel", Math.min(1, w.t / WARP_TUNNEL));
+      if (!w.swapped && w.t > 0.05) {
+        w.swapped = true;
+        this.arriveAt(w.target);
+      }
+      if (w.t >= WARP_TUNNEL) {
+        w.phase = "exit";
+        w.t = 0;
+        this.hud.setWarp("flash", getPlanet(w.target).name, getPlanet(w.target).tagline);
+      }
+      return;
+    }
+    this.onWarpPhase("exit", Math.min(1, w.t / WARP_EXIT));
+    if (w.t >= WARP_EXIT) {
+      const from = w.from;
+      this.warp = null;
+      this.hud.setWarp(null);
+      this.onWarpPhase("idle", 0);
+      this.onArrived(from);
+    }
+  }
+
+  /** Visual hook for the warp effect (graphics integration). */
+  private onWarpPhase(phase: "idle" | "spool" | "tunnel" | "exit", t: number): void {
+    void phase;
+    void t;
+  }
+
+  /** Swaps the world and drops the ship out of warp at the planet's arrival point. */
+  private arriveAt(id: PlanetId): void {
+    this.swapPlanet(id);
+    const a = this.planetDef.arrival;
+    this.ship.placeFlying(a.x, a.y, a.z, a.yaw, 45);
+    this.rig.yaw = a.yaw;
+    this.hud.setMode("flight");
+    this.syncShipModel(0);
+  }
+
+  private onArrived(from: PlanetId): void {
+    const id = this.planetId;
+    this.emit({ type: "warp", from, to: id });
+    this.progress({ type: "warp" });
+    this.progress({ type: "visit", planet: id });
+    this.hud.toast(`Arrived at ${this.planetDef.name} — ${this.planetDef.tagline}`, "good");
+    if (this.planetDef.hazard.kind !== "none") setTimeout(() => this.hud.toast(`Surface hazard: ${this.planetDef.hazard.label}. Watch your suit integrity.`, "warn"), 1800);
+    this.contractEvent({ type: "arrived", planet: id });
+    const first = !this.arrivals.has(id);
+    this.arrivals.add(id);
+    this.onFirstArrival(first);
+    this.refreshMissionHud();
+    void this.save();
+  }
+
+  /** Combat integration spawns arrival encounters here. */
+  private onFirstArrival(first: boolean): void {
+    void first;
+  }
+
+  /** Instant warp for tests and debugging (same code path minus the effect timing). */
+  warpNow(id: PlanetId): void {
+    const from = this.planetId;
+    if (this.mode === "onFoot") this.enterShip(false);
+    this.warp = null;
+    this.hud.setWarp(null);
+    this.arriveAt(id);
+    this.onArrived(from);
+  }
+
+  private updateSuit(dt: number, sheltered: boolean): void {
+    const def = this.planetDef;
+    if (def.hazard.kind === "none") {
+      this.suit.reset();
+      this.hud.setSuit(null);
+      return;
+    }
+    const p = this.player.position;
+    const intensity = sheltered ? 0 : def.hazard.intensity * this.planetInfo().hazardAt(p.x, p.z);
+    const t = this.suit.update(dt, def.hazard.kind, intensity, sheltered);
+    this.hud.setSuit(t.integrity, intensity > 0.05 ? `Suit · ${hazardLabel(def.hazard.kind)}` : "Suit");
+    if (t.warning) this.hud.toast(`Suit integrity low — ${hazardLabel(def.hazard.kind).toLowerCase()}. Return to the ${WORLD.shipName}.`, "warn");
+    if (t.failed && this.mode === "onFoot") {
+      this.hud.toast(`Suit failure — emergency recall to the ${WORLD.shipName}`, "bad");
+      this.enterShip(true);
+      this.suit.integrity = 0.25;
+      void this.save();
+    }
+  }
+
+  private progress(e: ProgressEvent): void {
+    const r = this.progression.handle(e);
+    for (const a of r.achievements) this.hud.toast(`Achievement: ${a.name} (+${a.xp} XP)${a.unlocksPaint ? " · new paint unlocked" : ""}`, "good");
+    if (r.rankUp) this.hud.toast(`Promoted to ${r.rankUp}`, "good");
+  }
+
+  contractEvent(e: ContractEvent): void {
+    const r = this.contracts.handle(e);
+    if (r.failed) this.hud.toast(r.failed, "warn");
+    if (r.completed) {
+      const def = r.completed;
+      const parts: string[] = [];
+      for (const id of ALL_RESOURCES) {
+        const n = def.reward.resources[id] ?? 0;
+        if (n <= 0) continue;
+        const got = this.inventory.add(id, n);
+        if (got > 0) parts.push(`+${got} ${RESOURCES[id].name}`);
+      }
+      this.progress({ type: "xp", amount: def.reward.xp });
+      this.progress({ type: "contract" });
+      this.hud.toast(`Contract complete: ${def.title}. ${[...parts, `+${def.reward.xp} XP`].join(" · ")}`, "good");
+      this.emit({ type: "contractComplete", id: def.id });
+      void this.save();
+    } else if (r.advanced) {
+      const sm = this.contracts.summary();
+      if (sm && sm.current === 0) this.hud.toast(`Contract objective: ${sm.title}`, "info");
+    }
+    if (r.advanced || r.failed) this.refreshMissionHud();
+  }
+
+  private shipLost(): void {
+    this.hud.toast("Hull critical — emergency recall to Halcyon Dock", "bad");
+    this.contractEvent({ type: "shipLost" });
+    if (this.planetId !== "veyra7") this.swapPlanet("veyra7");
+    this.ship.placeDocked(this.shipEnv);
+    this.ship.hull = this.ship.maxHull;
+    this.hud.setMode("parked");
+    void this.save();
+  }
+
+  private openStarMap(): void {
+    const target = this.contracts.targetPlanet();
+    const sel = this.starMapSel ?? (target && target !== this.planetId ? target : this.planetId);
+    const view = {
+      planets: PLANET_IDS.map((id) => {
+        const d = PLANETS[id];
+        const res = (Object.entries(d.resources.weights) as [ResourceId, number][]).filter(([, w]) => w >= 0.6).sort((a, b) => b[1] - a[1]).map(([r]) => r);
+        return {
+          id,
+          name: d.name,
+          tagline: d.tagline,
+          description: d.description,
+          danger: d.danger,
+          hazard: d.hazard.kind === "none" ? "None" : d.hazard.label,
+          x: d.map.x,
+          y: d.map.y,
+          color: d.map.color,
+          size: d.map.size,
+          ring: !!d.map.ring,
+          visited: this.progression.state.visited.includes(id),
+          current: id === this.planetId,
+          contractTarget: id === target,
+          hasStation: d.hasStation,
+          resources: res,
+        };
+      }),
+      selected: sel,
+      warp: this.canWarp(),
+      contract: this.contracts.summary() ? `${this.contracts.summary()!.contract} — ${this.contracts.summary()!.title}` : null,
+    };
+    this.input.setMode("ui");
+    const el = this.hud.showCustom("starmap", starMapHtml(view), true);
+    bindStarMap(
+      el,
+      (id) => {
+        this.starMapSel = id;
+        this.openStarMap();
+      },
+      (id) => {
+        this.starMapSel = null;
+        this.startWarp(id);
+      },
+    );
+  }
+
+  private openFrontier(): void {
+    const a = this.contracts.state.active;
+    const def = this.contracts.activeDef;
+    this.input.setMode("ui");
+    const el = this.hud.showCustom(
+      "frontier",
+      frontierHtml({
+        tab: this.frontierTab,
+        active: a && def ? { def, step: a.step, progress: a.progress } : null,
+        available: this.contracts.available(),
+        completed: this.contracts.state.completed.length,
+        progression: this.progression.state,
+      }),
+      true,
+    );
+    bindFrontier(el, {
+      tab: (t) => {
+        this.frontierTab = t;
+        this.openFrontier();
+      },
+      accept: (id) => {
+        if (this.contracts.accept(id)) {
+          this.contracts.settle({ planet: this.planetId });
+          this.hud.toast(`Contract accepted: ${this.contracts.activeDef?.title}`, "good");
+          this.refreshMissionHud();
+          void this.save();
+        }
+        this.openFrontier();
+      },
+      abandon: () => {
+        this.contracts.abandon();
+        this.refreshMissionHud();
+        void this.save();
+        this.openFrontier();
+      },
+      paint: (id) => {
+        if (this.progression.setPaint(id)) {
+          this.onStatsChanged();
+          void this.save();
+        }
+        this.openFrontier();
+      },
+    });
+  }
+
+  private contractWaypoint(): { pos: Vector3; label: string } | null {
+    const o = this.contracts.objective;
+    if (!o) return null;
+    const def = this.planetDef;
+    const site = def.landingSite;
+    const sitePos = () => new Vector3(site.x, this.planet.groundAt(site.x, site.z) + 4, site.z);
+    switch (o.kind) {
+      case "land":
+      case "scan":
+        if (o.planet !== this.planetId) return null;
+        if (this.mode === "onFoot" && o.kind === "scan") return null;
+        return { pos: sitePos(), label: site.name };
+      case "inspect": {
+        if (o.planet !== this.planetId) return null;
+        const pois = this.planet.pois.filter((p) => !this.looted.has(p.id) && (!o.poiKind || (p as unknown as { kind?: string }).kind === o.poiKind));
+        const from = this.mode === "onFoot" ? this.player.position : new Vector3(this.ship.x, this.ship.y, this.ship.z);
+        pois.sort((a, b) => Vector3.Distance(a.position, from) - Vector3.Distance(b.position, from));
+        return pois[0] ? { pos: pois[0].position.add(new Vector3(0, 4, 0)), label: pois[0].name } : null;
+      }
+      case "collect":
+        return null;
+      case "dock": {
+        if (!def.hasStation || this.mode !== "ship" || this.ship.state === "docked") return null;
+        const pad = stationPadPosition();
+        return { pos: new Vector3(pad.x, pad.y + 4, pad.z), label: WORLD.station.name };
+      }
+      default:
+        return null;
+    }
   }
 
   // ------------------------------------------------------------------ debug & dispose
@@ -1161,6 +1629,13 @@ export class Game {
         panel: g.hud.panel,
         tagged: g.tagged.size,
         target: g.currentTarget?.id ?? null,
+        planet: g.planetId,
+        warping: g.warp ? g.warp.phase : null,
+        contract: g.contracts.summary(),
+        contractsCompleted: [...g.contracts.state.completed],
+        xp: g.progression.state.xp,
+        achievements: [...g.progression.state.achievements],
+        suit: g.suit.integrity,
         fps: g.engine.getFps(),
         drawCalls: (g.engine as any)._drawCalls?.current ?? null,
         activeMeshes: g.scene.getActiveMeshes().length,
@@ -1198,6 +1673,8 @@ export class Game {
         g.renderer.governor.enabled = on;
       },
       save: () => g.save(),
+      warpNow: (id: PlanetId) => g.warpNow(id),
+      startWarp: (id: PlanetId) => g.startWarp(id),
     };
   }
 
