@@ -30,6 +30,8 @@ const CSS = `
 .gf-ch-thr{position:absolute;display:none;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:16px solid #ff5a5a;margin:-8px;filter:drop-shadow(0 0 4px #ff5a5a)}
 .gf-ch-thr.atk{animation:gfch-blink .5s infinite}
 @keyframes gfch-blink{50%{opacity:.25}}
+.gf-ch-mk{position:absolute;display:none;width:12px;height:12px;margin:-6px;border:2px solid var(--c,#ff5a5a);background:rgba(0,0,0,.35);transform:rotate(45deg);box-shadow:0 0 6px var(--c,#ff5a5a)}
+.gf-ch-mk.atk{background:var(--c,#ff5a5a)}
 .gf-ch-warn{position:absolute;left:50%;top:calc(50% + 48px);transform:translateX(-50%);padding:3px 12px;border-radius:999px;background:rgba(255,60,60,.85);font-size:11px;font-weight:700;letter-spacing:.2em;display:none}
 .gf-ch-warn.on{display:block;animation:gfch-blink .45s infinite}
 .gf-ch-boss{position:absolute;left:50%;transform:translateX(-50%);top:calc(34px + var(--sat,0px));width:min(360px,44vw);display:none;text-align:center;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
@@ -57,6 +59,7 @@ export class CombatHud {
   private readonly warn: HTMLElement;
   private readonly boss: HTMLElement;
   private readonly threats: HTMLElement[] = [];
+  private readonly marks: HTMLElement[] = [];
   private visible = false;
   private hitT = 0;
   private lastTag = "";
@@ -88,10 +91,16 @@ export class CombatHud {
     this.lead = q("[data-lead]");
     this.warn = q("[data-warn]");
     this.boss = q("[data-boss]");
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 8; i++) {
       const t = el("gf-ch-thr");
       this.root.appendChild(t);
       this.threats.push(t);
+    }
+    // On-screen hostile markers: enemies are often dark silhouettes against dark terrain.
+    for (let i = 0; i < 12; i++) {
+      const m = el("gf-ch-mk");
+      this.root.appendChild(m);
+      this.marks.push(m);
     }
   }
 
@@ -154,11 +163,24 @@ export class CombatHud {
 
     // Off-screen threat arrows, clamped to an inset rectangle.
     let ti = 0;
+    let mi = 0;
     for (const th of view.threats) {
-      if (ti >= this.threats.length) break;
       const p = project(th.position);
       const inside = !p.behind && p.x > 30 && p.y > 30 && p.x < w - 30 && p.y < h - 30;
-      if (inside) continue;
+      if (inside) {
+        // The locked target has its own bracket.
+        if (t && Math.hypot(th.position.x - t.position.x, th.position.y - t.position.y, th.position.z - t.position.z) < 1) continue;
+        if (mi < this.marks.length) {
+          const m = this.marks[mi++];
+          m.style.display = "block";
+          m.style.left = `${p.x}px`;
+          m.style.top = `${p.y}px`;
+          m.style.setProperty("--c", th.color);
+          m.classList.toggle("atk", th.attacking);
+        }
+        continue;
+      }
+      if (!th.engaged || ti >= this.threats.length) continue;
       let dx = p.x - w / 2, dy = p.y - h / 2;
       if (p.behind) {
         dx = -dx;
@@ -173,6 +195,7 @@ export class CombatHud {
       node.classList.toggle("atk", th.attacking);
     }
     for (; ti < this.threats.length; ti++) this.threats[ti].style.display = "none";
+    for (; mi < this.marks.length; mi++) this.marks[mi].style.display = "none";
 
     // Boss bar.
     const b = view.boss;

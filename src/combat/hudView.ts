@@ -24,6 +24,8 @@ export interface HudThreat {
   position: Vec3;
   /** Currently on an attack run / charging weapons at the player. */
   attacking: boolean;
+  /** Hunting the player (detect/pursue/attack/evade). Passive patrols only get an on-screen marker. */
+  engaged: boolean;
   color: string;
 }
 

@@ -836,10 +836,11 @@ export class CombatSystem {
     threats.length = 0;
     let incoming = false;
     for (const e of this.list) {
-      if (!e.target?.isPlayer || !(e.state === "detect" || e.state === "pursue" || e.state === "attack" || e.state === "evade")) continue;
-      const charging = e.charging;
+      if (!e.alive) continue;
+      const engaged = !!e.target?.isPlayer && (e.state === "detect" || e.state === "pursue" || e.state === "attack" || e.state === "evade");
+      const charging = engaged && e.charging;
       if (charging) incoming = true;
-      threats.push({ id: e.id, position: e.pos, attacking: e.state === "attack" || charging, color: FACTIONS[e.faction].color });
+      threats.push({ id: e.id, position: e.pos, attacking: engaged && (e.state === "attack" || charging), engaged, color: FACTIONS[e.faction].color });
     }
     if (!incoming && this.playerActive) {
       // In-flight bolts whose closest approach in the next 1.2 s passes within 25 m.
