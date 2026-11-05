@@ -70,8 +70,9 @@ async function fight(page, label, done, simBudgetS, onTick) {
   let lastCycle = t0;
   let outcome = "timeout";
   const log = { minShield: 1e9, minHull: 1e9, maxEnemies: 0 };
+  // The pilot assist runs inside the game frame (autoAim), so it acts once per rendered frame whatever the runner speed.
+  await page.evaluate(() => window.__GF.autoAim(true));
   while (Date.now() - t0 < WALL_CAP_MS) {
-    await page.evaluate(() => window.__GF.aimAtTarget());
     await page.waitForTimeout(200);
     const s = await st(page);
     log.minShield = Math.min(log.minShield, s.combat.shield);
@@ -94,6 +95,7 @@ async function fight(page, label, done, simBudgetS, onTick) {
     }
   }
   await page.mouse.up();
+  await page.evaluate(() => window.__GF.autoAim(false)).catch(() => {});
   if (outcome === "timeout") {
     // Evidence for diagnosing a stuck fight: where is every hostile and what is it doing?
     const d = await page.evaluate(() => { const x = window.__GF.state(); return x.combat.enemies.map((e) => `${e.type}:${e.state}@${Math.round(Math.hypot(e.x - x.ship.x, e.y - x.ship.y, e.z - x.ship.z))}m(y${Math.round(e.y)})`).join(" ") + ` | ship y${Math.round(x.ship.y)} speed ${Math.round(x.ship.speed)} planet ${x.planet}`; });

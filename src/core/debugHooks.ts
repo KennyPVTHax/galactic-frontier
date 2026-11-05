@@ -12,6 +12,27 @@ import { deriveStats, sanitizeLevels } from "../gameplay/upgrades";
 import { rulesFingerprint, rulesManifest } from "../shared/rules";
 
 export function installDebugHooks(g: any): void {
+  let autoAimObs: any = null;
+  const aimOnce = (): boolean => {
+    const tgt = g.combat.target();
+    const e = tgt?.enemy ?? g.combat.enemies().find((x: any) => x.alive);
+    if (!e) return false;
+    let aim = e.pos;
+    // Capital ships: shoot the shield spire first, then missile racks, turrets and hangar (the intended play).
+    if (e.boss) for (const id of ["generator", "seekerL", "seekerR", "turretFL", "turretFR", "turretAL", "turretAR", "hangar"]) {
+      const h = e.boss.hardpoints.find((q: any) => q.id === id && q.alive);
+      if (h) { aim = h.world; break; }
+    }
+    const dx = aim.x - g.ship.x, dy = aim.y - g.ship.y, dz = aim.z - g.ship.z;
+    g.ship.yaw = Math.atan2(dx, dz);
+    g.ship.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+    // Test-pilot assist (declared in scripts/contracts-e2e.cjs): chase a hostile that has drifted out of weapon range.
+    // (an approach controller, not a ratchet: close in when far, ease off in the dogfight so the nose can track)
+    const dist = Math.hypot(dx, dy, dz);
+    g.ship.throttle = dist > 520 ? 0.9 : dist < 150 ? 0.3 : 0.55;
+    return true;
+  };
+
   (window as any).__GF = {
     game: g,
     state: () => ({
@@ -109,24 +130,11 @@ export function installDebugHooks(g: any): void {
     g.onArrived(from);
   },
     /** Test helper: point the Wayfarer's nose at the locked/nearest hostile (mouse aiming is impractical at 2 fps). */
-    aimAtTarget: () => {
-      const tgt = g.combat.target();
-      const e = tgt?.enemy ?? g.combat.enemies().find((x: any) => x.alive);
-      if (!e) return false;
-      let aim = e.pos;
-      // Capital ships: shoot the shield spire first, then missile racks, turrets and hangar (the intended play).
-      if (e.boss) for (const id of ["generator", "seekerL", "seekerR", "turretFL", "turretFR", "turretAL", "turretAR", "hangar"]) {
-        const h = e.boss.hardpoints.find((q: any) => q.id === id && q.alive);
-        if (h) { aim = h.world; break; }
-      }
-      const dx = aim.x - g.ship.x, dy = aim.y - g.ship.y, dz = aim.z - g.ship.z;
-      g.ship.yaw = Math.atan2(dx, dz);
-      g.ship.pitch = Math.atan2(dy, Math.hypot(dx, dz));
-      // Test-pilot assist (declared in scripts/contracts-e2e.cjs): chase a hostile that has drifted out of weapon range.
-      // (an approach controller, not a ratchet: close in when far, ease off in the dogfight so the nose can track)
-      const dist = Math.hypot(dx, dy, dz);
-      g.ship.throttle = dist > 520 ? 0.9 : dist < 150 ? 0.3 : 0.55;
-      return true;
+    aimAtTarget: () => aimOnce(),
+    /** Test pilot assist run INSIDE the game frame (per rendered frame), so its behaviour does not depend on how fast the harness polls. */
+    autoAim: (on: boolean) => {
+      if (autoAimObs) { g.scene.onBeforeRenderObservable.remove(autoAimObs); autoAimObs = null; }
+      if (on) autoAimObs = g.scene.onBeforeRenderObservable.add(() => { aimOnce(); });
     },
     spawnEncounter: (id: string) => g.spawnContractEncounter(id),
     startWarp: (id: PlanetId) => g.startWarp(id),
