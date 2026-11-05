@@ -69,6 +69,22 @@ export interface RendererDeps {
   caps: GpuCapabilities;
 }
 
+/** Per-planet lighting/fog multipliers on top of the render profile (1 = Veyra-7 / M2 look). */
+export interface WorldLighting {
+  sun: number;
+  ambient: number;
+  fog: number;
+}
+
+/** The planet-owned objects the renderer binds to. Swapped on warp via Renderer.setWorld. */
+export interface RendererWorld {
+  sun: DirectionalLight;
+  ambient: HemisphericLight;
+  skyMesh: Mesh;
+  sky: SkyRadiance;
+  lighting?: WorldLighting;
+}
+
 export interface ProfileHooks {
   /** Called with the decor fraction to draw (0..1). */
   setDecorDensity(decor: number, grass: number, distance: number): void;
@@ -95,6 +111,7 @@ export class Renderer {
   private shadowStep = 0;
   private bloomOff = false;
   resolutionScale = 1;
+  private lighting: WorldLighting = { sun: 1, ambient: 1, fog: 1 };
 
   constructor(
     private readonly d: RendererDeps,
@@ -127,11 +144,12 @@ export class Renderer {
     materials.setMode(profile.pbr, profile.terrainDetail >= 2, profile.atmosphere);
 
     // Lighting & fog balance per shading model.
-    this.d.ambient.intensity = profile.pbr ? 0.32 : 0.62;
-    this.d.sun.intensity = profile.pbr ? 2.6 : 1.75;
+    const L = this.lighting;
+    this.d.ambient.intensity = (profile.pbr ? 0.32 : 0.62) * L.ambient;
+    this.d.sun.intensity = (profile.pbr ? 2.6 : 1.75) * L.sun;
     scene.fogMode = profile.atmosphere ? Scene.FOGMODE_NONE : Scene.FOGMODE_EXP2;
-    scene.fogDensity = profile.fogDensity;
-    WorldUniforms.atmos.x = profile.fogDensity * 1.05;
+    scene.fogDensity = profile.fogDensity * L.fog;
+    WorldUniforms.atmos.x = profile.fogDensity * 1.05 * L.fog;
     WorldUniforms.params.w = profile.terrainDetail === 0 ? 1 / 90 : 1 / 160;
 
     this.setupEnvironment(profile);
@@ -148,6 +166,40 @@ export class Renderer {
       this.governor.reset({ maxScale: profile.renderScale, minScale: profile.minRenderScale, targetFps: profile.targetFps, enabled: this.governor.enabled });
     }
     this.applyResolution();
+  }
+
+  /**
+   * Rebinds to a new planet's sun, ambient light and sky (warp travel) and
+   * re-applies the current profile. Shadow generators and the reflection probe
+   * belong to the old lights/sky and are rebuilt.
+   */
+  /** Disposes the shadow generators and reflection probe bound to the current world's lights (call before disposing those lights). */
+  releaseWorld(): void {
+    this.csm?.dispose();
+    this.shadow?.dispose();
+    this.csm = null;
+    this.shadow = null;
+    this.probe?.dispose();
+    this.probe = null;
+    this.d.scene.environmentTexture = null;
+    this.envPoly = null;
+  }
+
+  setWorld(w: RendererWorld): void {
+    this.csm?.dispose();
+    this.shadow?.dispose();
+    this.csm = null;
+    this.shadow = null;
+    this.probe?.dispose();
+    this.probe = null;
+    this.d.scene.environmentTexture = null;
+    this.envPoly = null;
+    this.d.sun = w.sun;
+    this.d.ambient = w.ambient;
+    this.d.skyMesh = w.skyMesh;
+    this.d.sky = w.sky;
+    this.lighting = { sun: 1, ambient: 1, fog: 1, ...(w.lighting ?? {}) };
+    if (this.profile) this.apply(this.profile);
   }
 
   applyResolution(): void {

@@ -3,12 +3,19 @@
 //   node scripts/build.mjs lib      -> dist/lib/galactic-frontier.js  (ESM module for the React host)
 //   node scripts/build.mjs preview  -> dist/preview/index.html        (single self-contained playable file)
 //   node scripts/build.mjs serve    -> dev server on http://localhost:5173
+//   node scripts/build.mjs release  -> dist/web/index.html  (single playable file, test hooks compiled out)
+//   node scripts/build.mjs android  -> android/app/src/main/assets/www/index.html (Galactic Frontier FULL: the Android package)
+//   node scripts/build.mjs telegram -> dist/telegram/index.html (Galactic Frontier LITE: the Telegram Mini App package)
+//   node scripts/build.mjs telegram-test -> dist/telegram-test/index.html (LITE + window.__GF test hooks; CI only, never shipped)
+//
+// `lib`, `preview` and `serve` keep the window.__GF test hooks (used by the browser tests). `release` and
+// `android` define __GF_DEBUG__=false so src/core/debugHooks.ts is dropped from the bundle.
 //
 // Babylon.js is resolved from node_modules/@babylonjs/core as normal. For offline builds
 // against a Babylon source checkout, set BABYLON_CORE_SRC=/path/to/Babylon.js/packages/dev/core/src
 // (shader .fx files must be pre-generated to .ts in that checkout).
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,6 +44,35 @@ if (babylonSrc && !existsSync(join(root, "node_modules/@babylonjs/core"))) {
 }
 
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const releaseMode = mode === "release" || mode === "android" || mode === "telegram";
+// Presentation package. LITE is the Telegram Mini App; FULL is everything else (Android, desktop, preview).
+// Both run the identical shared gameplay core (see tests/architecture.test.ts + tests/package-parity.test.ts).
+const pkgName = mode === "telegram" || mode === "telegram-test" ? "lite" : "full";
+
+/**
+ * esbuild plugin shared by all packages: Babylon ships every shader twice (GLSL + WGSL). This game only creates a WebGL
+ * Engine, so the WGSL copies are dead weight (~420 KB). They are replaced by an empty module.
+ * LITE additionally swaps the engine facade for src/engine/babylon.lite.ts, which stubs the heavyweight features
+ * (PBR, post-process pipeline, cascaded shadows, reflection probes, ...) so their code and shaders never enter the bundle.
+ */
+const packagePlugin = {
+  name: "gf-package",
+  setup(b) {
+    b.onLoad({ filter: /[\\/]@babylonjs[\\/]core[\\/]ShadersWGSL[\\/].*\.js$/ }, () => ({ contents: "export {};", loader: "js" }));
+    // The glTF loader statically references Babylon's OpenPBR material (~230 KB with shaders). This game uses the standard
+    // metallic-roughness PBRMaterial for glTF, never OpenPBR, so it is replaced by an inert stub.
+    b.onLoad({ filter: /[\\/]@babylonjs[\\/]core[\\/]Materials[\\/]PBR[\\/]openpbrMaterial\.pure\.js$/ }, () => ({
+      contents: "export class OpenPBRMaterial { constructor() { throw new Error('OpenPBRMaterial is not included in this build'); } }\nexport function RegisterOpenpbrMaterial() {}\nexport const OpenPBRMaterialDefines = class {};",
+      loader: "js",
+    }));
+    if (pkgName === "lite") {
+      const lite = join(root, "src/engine/babylon.lite.ts");
+      b.onResolve({ filter: /(^|\/)engine\/babylon$/ }, (a) => (a.importer === lite ? undefined : { path: lite }));
+      // Presentation facades that have a Lite stand-in (src/presentation/<name>.lite.ts).
+      b.onResolve({ filter: /(^|\/)presentation\/(cinematic|astronaut)$/ }, (a) => ({ path: join(root, `src/presentation/${a.path.split("/").pop()}.lite.ts`) }));
+    }
+  },
+};
 const common = {
   bundle: true,
   format: "esm",
@@ -44,7 +80,10 @@ const common = {
   alias,
   define: {
     __GF_VERSION__: JSON.stringify(pkg.version),
+    __GF_DEBUG__: releaseMode ? "false" : "true",
+    __GF_PACKAGE__: JSON.stringify(pkgName),
   },
+  plugins: [packagePlugin],
   logLevel: "info",
   legalComments: "none",
   tsconfigRaw: undefined,
@@ -72,8 +111,23 @@ async function buildPreviewBundle(minify = true) {
   return { js: result.outputFiles[0].text, meta: result.metafile };
 }
 
-function htmlShell(inlineJs) {
-  const tpl = readFileSync(join(root, "index.html"), "utf8");
+// Release pages get a strict CSP: only the inline bundle runs, nothing can be fetched from the network.
+// FULL packages may fetch their own bundled hero models (same origin only: the APK's appassets origin / the web build's own host);
+// LITE ships no models and keeps the original no-fetch policy.
+const RELEASE_CSP = `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src ${pkgName === "full" ? "'self' " : ""}data: blob:; worker-src blob:; base-uri 'none'; form-action 'none'`;
+
+/** Copies authored glTF/GLB hero assets (assets/models: manifest.json, *.glb, CREDITS.md) next to a FULL build's index.html. Never for Lite. */
+function copyModels(outDir) {
+  if (pkgName !== "full") return;
+  const src = join(root, "assets/models");
+  if (!existsSync(join(src, "manifest.json"))) return;
+  cpSync(src, join(outDir, "models"), { recursive: true });
+  console.log(`[build] models -> ${join(outDir, "models")}`);
+}
+
+function htmlShell(inlineJs, release = false) {
+  let tpl = readFileSync(join(root, "index.html"), "utf8");
+  if (release) tpl = tpl.replace("<head>", `<head>\n    <meta http-equiv="Content-Security-Policy" content="${RELEASE_CSP}" />`);
   // Avoid closing the inline <script> early.
   const safe = inlineJs.replace(/<\/script/gi, "<\\/script");
   return tpl.replace('<script type="module" src="/src/main.ts"></script>', () => `<script>${safe}</script>`);
@@ -84,6 +138,7 @@ async function buildPreview() {
   const out = join(root, "dist/preview/index.html");
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, htmlShell(js));
+  copyModels(dirname(out));
   writeFileSync(join(root, "dist/preview/meta.json"), JSON.stringify(meta));
   // Body-only variant for hosts that supply their own document skeleton (e.g. claude.ai artifacts).
   const safe = js.replace(/<\/script/gi, "<\\/script");
@@ -114,7 +169,30 @@ async function serve() {
   console.log(`[dev] http://localhost:${port}`);
 }
 
-if (mode === "lib") await buildLib();
+async function buildTelegramTest() {
+  // Same Lite bundle (same engine facade, same stubs), but with debug hooks so the real Lite code can be driven by the browser tests.
+  const { js } = await buildPreviewBundle(true);
+  const out = join(root, "dist/telegram-test/index.html");
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, htmlShell(js));
+  console.log(`[build] telegram-test -> ${out} (${(Buffer.byteLength(js) / 1024).toFixed(0)} KB JS, debug hooks: ON — not for distribution)`);
+}
+
+async function buildRelease(outFile) {
+  const { js, meta } = await buildPreviewBundle(true);
+  mkdirSync(dirname(outFile), { recursive: true });
+  writeFileSync(outFile, htmlShell(js, true));
+  copyModels(dirname(outFile));
+  // Bundle composition (inputs → bytes). Kept outside the shipped HTML; tests/package-boundary.test.ts reads it.
+  if (mode !== "android") writeFileSync(join(dirname(outFile), "meta.json"), JSON.stringify(meta));
+  console.log(`[build] ${mode} -> ${outFile} (${(Buffer.byteLength(js) / 1024).toFixed(0)} KB JS inlined, debug hooks: off)`);
+}
+
+if (mode === "release") await buildRelease(join(root, "dist/web/index.html"));
+else if (mode === "android") await buildRelease(join(root, "android/app/src/main/assets/www/index.html"));
+else if (mode === "telegram") await buildRelease(join(root, "dist/telegram/index.html"));
+else if (mode === "telegram-test") await buildTelegramTest();
+else if (mode === "lib") await buildLib();
 else if (mode === "preview") await buildPreview();
 else if (mode === "serve") await serve();
 else throw new Error(`Unknown mode ${mode}`);

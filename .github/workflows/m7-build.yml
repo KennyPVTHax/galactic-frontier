@@ -1,0 +1,245 @@
+name: M7 build (web preview + Android debug APK)
+
+# Builds downloadable test artifacts. Nothing is deployed anywhere and nothing is published to a store.
+on:
+  workflow_dispatch:
+    inputs:
+      full_e2e:
+        description: "Also run the journey on Enhanced and Extreme HD (slow, software rendering)"
+        type: boolean
+        default: false
+  pull_request:
+  push:
+    branches: [claude/galactic-frontier-m2-m6-jaqnfn]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m7-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks-and-web:
+    name: Typecheck, unit tests, web preview
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build release web preview (test hooks compiled out)
+        run: |
+          npm run build:release
+          rm -f dist/web/meta.json
+          sha256sum dist/web/index.html | tee dist/web/index.html.sha256
+          cp docs/PHONE-TESTING.md dist/web/PHONE-TESTING.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: galactic-frontier-web-preview
+          path: dist/web/
+          if-no-files-found: error
+      - name: Build Galactic Frontier Lite (Telegram Mini App package, test hooks compiled out)
+        run: |
+          npm run build:telegram
+          sha256sum dist/telegram/index.html | tee dist/telegram/index.html.sha256
+          rm -f dist/telegram/meta.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: galactic-frontier-telegram-lite
+          path: dist/telegram/
+          if-no-files-found: error
+
+  android-apk:
+    name: Android debug APK
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci --ignore-scripts
+      - name: Bundle the game into the app (release build, test hooks compiled out)
+        run: npm run build:android-assets
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleDebug
+      - name: Verify the APK (no network permission, no test hooks, bundled game present)
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          AAPT2="$ANDROID_HOME/build-tools/34.0.0/aapt2"
+          "$AAPT2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdk|uses-permission"
+          if "$AAPT2" dump permissions "$APK" | grep -q "android.permission.INTERNET"; then echo "INTERNET permission present"; exit 1; fi
+          unzip -p "$APK" assets/www/index.html > /tmp/game.html
+          test -s /tmp/game.html
+          if grep -q "window.__GF" /tmp/game.html; then echo "test hooks found in bundled game"; exit 1; fi
+          unzip -l "$APK" | grep -q "assets/www/models/manifest.json" || { echo "hero-model manifest missing from the APK"; exit 1; }
+          unzip -l "$APK" | grep -q "assets/www/models/astronaut/tnnv-spacesuit.glb" || { echo "tnnv astronaut GLB missing from the APK"; exit 1; }
+          unzip -l "$APK" | grep -q "assets/www/models/CREDITS.md" || { echo "model credits missing from the APK"; exit 1; }
+          unzip -p "$APK" assets/www/models/astronaut/tnnv-spacesuit.glb | sha256sum | grep -q b7f82d87b261b1ee8bccfd99f289dd299e0ab39e8e13be39c14d10b0ce7bcf31 || { echo "APK GLB differs from the credited asset"; exit 1; }
+          echo "APK hero models:"; unzip -l "$APK" | grep "assets/www/models/" || true
+          mkdir -p out
+          cp "$APK" out/galactic-frontier-m7-debug.apk
+          (cd out && sha256sum galactic-frontier-m7-debug.apk | tee galactic-frontier-m7-debug.apk.sha256)
+          cp docs/PHONE-TESTING.md out/PHONE-TESTING.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: galactic-frontier-android-debug-apk
+          path: out/
+          if-no-files-found: error
+
+  journey-basic:
+    name: Browser journey (basic)
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Play the required journey
+        run: node scripts/journey-test.cjs test-results/journey basic
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-basic
+          path: test-results/journey/
+
+  # M8: the real Lite (Telegram) bundle plays the same journey, and both packages must produce identical rules/outcomes.
+  lite-and-parity:
+    name: Lite journey + Lite/Full parity
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview && npm run build:telegram-test
+      - name: Required journey on the Lite bundle
+        run: GF_BUILD=telegram-test node scripts/journey-test.cjs test-results/journey-lite basic
+      - name: Parity - same rules fingerprint, costs, farming and stats in Lite and Full
+        run: node scripts/parity-test.cjs
+      - name: Hero-asset pipeline in the real game (GLB adoption, retargeting, 3 fallbacks, Basic tier)
+        run: node scripts/hero-asset-test.cjs test-results/hero-assets
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lite-journey-and-parity
+          path: |
+            test-results/journey-lite/
+            test-results/hero-assets/
+
+  # Heavier tiers: software rendering makes these slow, so they run on request (workflow_dispatch full_e2e).
+  journey-heavy:
+    name: Browser journey (${{ matrix.tier }})
+    needs: checks-and-web
+    if: ${{ github.event.inputs.full_e2e == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        tier: [enhanced, ultra]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Play the required journey
+        run: node scripts/journey-test.cjs test-results/journey ${{ matrix.tier }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: journey-${{ matrix.tier }}
+          path: test-results/journey/
+
+  leaks:
+    name: Planet-swap leak test
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Warp through all six planets for 5 laps, forcing GC, and check nothing is retained
+        run: node scripts/leak-test.cjs basic 5
+
+  contracts-e2e:
+    name: Contract E2E (station defense + escort)
+    needs: checks-and-web
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Real browser combat for the station-defense and escort contracts
+        run: |
+          node scripts/contracts-e2e.cjs station basic test-results/contracts-e2e
+          node scripts/contracts-e2e.cjs escort basic test-results/contracts-e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contracts-e2e
+          path: test-results/contracts-e2e/
+
+  contracts-e2e-boss:
+    name: Contract E2E (dreadnought boss)
+    needs: checks-and-web
+    if: ${{ github.event.inputs.full_e2e == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:preview
+      - name: Fight the dreadnought in a real browser (declared hull top-ups; see script header)
+        run: node scripts/contracts-e2e.cjs boss basic test-results/contracts-e2e-boss
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contracts-e2e-boss
+          path: test-results/contracts-e2e-boss/

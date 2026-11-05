@@ -1,0 +1,937 @@
+{
+ "note": "Headless Chromium + SwiftShader (CPU). Not representative of real devices; compare only against each other, same machine.",
+ "runs": [
+  {
+   "name": "telegram-lite",
+   "tier": "basic",
+   "loadMs": 1761,
+   "flight": {
+    "frames": 50,
+    "avgFps": 4.19,
+    "low1PctFps": 2,
+    "p50Ms": 233.3,
+    "p95Ms": 283.3,
+    "p99Ms": 499.9,
+    "maxMs": 499.9,
+    "peakHeapMB": 90.7,
+    "drawCalls": 83,
+    "trianglesK": 80,
+    "textureMB": 4,
+    "renderScale": 0.85,
+    "shadows": "none"
+   },
+   "transitions": [
+    {
+     "planet": "veyra7",
+     "meshes": 977,
+     "materials": 75,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0
+    },
+    {
+     "lap": 0,
+     "planet": "aetherion",
+     "swapMs": 1225,
+     "meshes": 1136,
+     "materials": 82,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 96.7
+    },
+    {
+     "lap": 0,
+     "planet": "kryos",
+     "swapMs": 1270,
+     "meshes": 1049,
+     "materials": 83,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 35,
+     "unreadyMaterials": 0,
+     "heapMB": 108.3
+    },
+    {
+     "lap": 0,
+     "planet": "pyron",
+     "swapMs": 1006,
+     "meshes": 1039,
+     "materials": 83,
+     "textures": 26,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 146.3
+    },
+    {
+     "lap": 0,
+     "planet": "zephyria",
+     "swapMs": 1071,
+     "meshes": 1058,
+     "materials": 87,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 210.4
+    },
+    {
+     "lap": 0,
+     "planet": "noctaris",
+     "swapMs": 1172,
+     "meshes": 1010,
+     "materials": 85,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 36,
+     "transformNodes": 36,
+     "unreadyMaterials": 0,
+     "heapMB": 233.8
+    },
+    {
+     "lap": 0,
+     "planet": "veyra7",
+     "swapMs": 1171,
+     "meshes": 991,
+     "materials": 82,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 85.6
+    },
+    {
+     "lap": 1,
+     "planet": "aetherion",
+     "swapMs": 1099,
+     "meshes": 1144,
+     "materials": 86,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 116.5
+    },
+    {
+     "lap": 1,
+     "planet": "kryos",
+     "swapMs": 1098,
+     "meshes": 1048,
+     "materials": 86,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 150.7
+    },
+    {
+     "lap": 1,
+     "planet": "pyron",
+     "swapMs": 921,
+     "meshes": 1038,
+     "materials": 86,
+     "textures": 26,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 212.8
+    },
+    {
+     "lap": 1,
+     "planet": "zephyria",
+     "swapMs": 1070,
+     "meshes": 1055,
+     "materials": 87,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 246.5
+    },
+    {
+     "lap": 1,
+     "planet": "noctaris",
+     "swapMs": 1034,
+     "meshes": 1003,
+     "materials": 85,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 36,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 282.9
+    },
+    {
+     "lap": 1,
+     "planet": "veyra7",
+     "swapMs": 1324,
+     "meshes": 991,
+     "materials": 82,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 103.6
+    }
+   ],
+   "leakLap2VsLap1": [
+    {
+     "planet": "aetherion",
+     "dMeshes": 8,
+     "dMaterials": 4,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "kryos",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "pyron",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "zephyria",
+     "dMeshes": -3,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "noctaris",
+     "dMeshes": -7,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "veyra7",
+     "dMeshes": 0,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    }
+   ],
+   "errors": []
+  },
+  {
+   "name": "telegram-basic",
+   "tier": "basic",
+   "loadMs": 1465,
+   "flight": {
+    "frames": 53,
+    "avgFps": 4.39,
+    "low1PctFps": 2.73,
+    "p50Ms": 233.2,
+    "p95Ms": 283.4,
+    "p99Ms": 366.7,
+    "maxMs": 366.7,
+    "peakHeapMB": 72.2,
+    "drawCalls": 83,
+    "trianglesK": 80,
+    "textureMB": 4,
+    "renderScale": 0.85,
+    "shadows": "none"
+   },
+   "transitions": [
+    {
+     "planet": "veyra7",
+     "meshes": 977,
+     "materials": 75,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0
+    },
+    {
+     "lap": 0,
+     "planet": "aetherion",
+     "swapMs": 1226,
+     "meshes": 1136,
+     "materials": 82,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 74.8
+    },
+    {
+     "lap": 0,
+     "planet": "kryos",
+     "swapMs": 1167,
+     "meshes": 1049,
+     "materials": 83,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 35,
+     "unreadyMaterials": 0,
+     "heapMB": 134.6
+    },
+    {
+     "lap": 0,
+     "planet": "pyron",
+     "swapMs": 1099,
+     "meshes": 1039,
+     "materials": 83,
+     "textures": 26,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 160.2
+    },
+    {
+     "lap": 0,
+     "planet": "zephyria",
+     "swapMs": 1053,
+     "meshes": 1058,
+     "materials": 87,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 209.3
+    },
+    {
+     "lap": 0,
+     "planet": "noctaris",
+     "swapMs": 1130,
+     "meshes": 1010,
+     "materials": 85,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 36,
+     "transformNodes": 36,
+     "unreadyMaterials": 0,
+     "heapMB": 238.2
+    },
+    {
+     "lap": 0,
+     "planet": "veyra7",
+     "swapMs": 1251,
+     "meshes": 991,
+     "materials": 82,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 287.2
+    },
+    {
+     "lap": 1,
+     "planet": "aetherion",
+     "swapMs": 1071,
+     "meshes": 1144,
+     "materials": 86,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 98.9
+    },
+    {
+     "lap": 1,
+     "planet": "kryos",
+     "swapMs": 1081,
+     "meshes": 1048,
+     "materials": 86,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 113.6
+    },
+    {
+     "lap": 1,
+     "planet": "pyron",
+     "swapMs": 1060,
+     "meshes": 1038,
+     "materials": 86,
+     "textures": 26,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 160
+    },
+    {
+     "lap": 1,
+     "planet": "zephyria",
+     "swapMs": 1021,
+     "meshes": 1055,
+     "materials": 87,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 213
+    },
+    {
+     "lap": 1,
+     "planet": "noctaris",
+     "swapMs": 1011,
+     "meshes": 1003,
+     "materials": 85,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 36,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 235.9
+    },
+    {
+     "lap": 1,
+     "planet": "veyra7",
+     "swapMs": 1234,
+     "meshes": 991,
+     "materials": 82,
+     "textures": 25,
+     "lights": 2,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 92.9
+    }
+   ],
+   "leakLap2VsLap1": [
+    {
+     "planet": "aetherion",
+     "dMeshes": 8,
+     "dMaterials": 4,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "kryos",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "pyron",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "zephyria",
+     "dMeshes": -3,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "noctaris",
+     "dMeshes": -7,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "veyra7",
+     "dMeshes": 0,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    }
+   ],
+   "errors": []
+  },
+  {
+   "name": "full-ultra cinematic=0",
+   "tier": "ultra",
+   "loadMs": 3795,
+   "flight": {
+    "frames": 9,
+    "avgFps": 0.71,
+    "low1PctFps": 0.59,
+    "p50Ms": 1416.6,
+    "p95Ms": 1683.3,
+    "p99Ms": 1683.3,
+    "maxMs": 1683.3,
+    "peakHeapMB": 99.2,
+    "drawCalls": 163,
+    "trianglesK": 389,
+    "textureMB": 103.9,
+    "renderScale": 1,
+    "shadows": "cascaded"
+   },
+   "transitions": [
+    {
+     "planet": "veyra7",
+     "meshes": 980,
+     "materials": 78,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0
+    },
+    {
+     "lap": 0,
+     "planet": "aetherion",
+     "swapMs": 4584,
+     "meshes": 1139,
+     "materials": 85,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 141.6
+    },
+    {
+     "lap": 0,
+     "planet": "kryos",
+     "swapMs": 2829,
+     "meshes": 1052,
+     "materials": 86,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 35,
+     "unreadyMaterials": 0,
+     "heapMB": 188.3
+    },
+    {
+     "lap": 0,
+     "planet": "pyron",
+     "swapMs": 2737,
+     "meshes": 1042,
+     "materials": 86,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 241.9
+    },
+    {
+     "lap": 0,
+     "planet": "zephyria",
+     "swapMs": 2797,
+     "meshes": 1061,
+     "materials": 90,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 274.2
+    },
+    {
+     "lap": 0,
+     "planet": "noctaris",
+     "swapMs": 3108,
+     "meshes": 1013,
+     "materials": 88,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 36,
+     "transformNodes": 36,
+     "unreadyMaterials": 0,
+     "heapMB": 313.6
+    },
+    {
+     "lap": 0,
+     "planet": "veyra7",
+     "swapMs": 3876,
+     "meshes": 994,
+     "materials": 85,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 116.9
+    },
+    {
+     "lap": 1,
+     "planet": "aetherion",
+     "swapMs": 3913,
+     "meshes": 1147,
+     "materials": 89,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 179.4
+    },
+    {
+     "lap": 1,
+     "planet": "kryos",
+     "swapMs": 3013,
+     "meshes": 1051,
+     "materials": 89,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 233.6
+    },
+    {
+     "lap": 1,
+     "planet": "pyron",
+     "swapMs": 3005,
+     "meshes": 1041,
+     "materials": 89,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 291.8
+    },
+    {
+     "lap": 1,
+     "planet": "zephyria",
+     "swapMs": 2699,
+     "meshes": 1058,
+     "materials": 90,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 334.5
+    },
+    {
+     "lap": 1,
+     "planet": "noctaris",
+     "swapMs": 2830,
+     "meshes": 1006,
+     "materials": 88,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 36,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 380.1
+    },
+    {
+     "lap": 1,
+     "planet": "veyra7",
+     "swapMs": 3611,
+     "meshes": 994,
+     "materials": 85,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 133.8
+    }
+   ],
+   "leakLap2VsLap1": [
+    {
+     "planet": "aetherion",
+     "dMeshes": 8,
+     "dMaterials": 4,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "kryos",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "pyron",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "zephyria",
+     "dMeshes": -3,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "noctaris",
+     "dMeshes": -7,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "veyra7",
+     "dMeshes": 0,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    }
+   ],
+   "errors": []
+  },
+  {
+   "name": "full-ultra cinematic=3",
+   "tier": "ultra",
+   "loadMs": 3611,
+   "flight": {
+    "frames": 10,
+    "avgFps": 0.75,
+    "low1PctFps": 0.62,
+    "p50Ms": 1449.9,
+    "p95Ms": 1616.6,
+    "p99Ms": 1616.6,
+    "maxMs": 1616.6,
+    "peakHeapMB": 99.4,
+    "drawCalls": 163,
+    "trianglesK": 392,
+    "textureMB": 103.9,
+    "renderScale": 1,
+    "shadows": "cascaded"
+   },
+   "transitions": [
+    {
+     "planet": "veyra7",
+     "meshes": 980,
+     "materials": 78,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0
+    },
+    {
+     "lap": 0,
+     "planet": "aetherion",
+     "swapMs": 4414,
+     "meshes": 1139,
+     "materials": 85,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 131.8
+    },
+    {
+     "lap": 0,
+     "planet": "kryos",
+     "swapMs": 2875,
+     "meshes": 1052,
+     "materials": 86,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 35,
+     "unreadyMaterials": 0,
+     "heapMB": 180.5
+    },
+    {
+     "lap": 0,
+     "planet": "pyron",
+     "swapMs": 2849,
+     "meshes": 1042,
+     "materials": 86,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 216.4
+    },
+    {
+     "lap": 0,
+     "planet": "zephyria",
+     "swapMs": 2984,
+     "meshes": 1061,
+     "materials": 90,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 265.3
+    },
+    {
+     "lap": 0,
+     "planet": "noctaris",
+     "swapMs": 2932,
+     "meshes": 1013,
+     "materials": 88,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 36,
+     "transformNodes": 36,
+     "unreadyMaterials": 0,
+     "heapMB": 313.5
+    },
+    {
+     "lap": 0,
+     "planet": "veyra7",
+     "swapMs": 3933,
+     "meshes": 994,
+     "materials": 85,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 371.6
+    },
+    {
+     "lap": 1,
+     "planet": "aetherion",
+     "swapMs": 4225,
+     "meshes": 1147,
+     "materials": 89,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 151.4
+    },
+    {
+     "lap": 1,
+     "planet": "kryos",
+     "swapMs": 3100,
+     "meshes": 1051,
+     "materials": 89,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 228.1
+    },
+    {
+     "lap": 1,
+     "planet": "pyron",
+     "swapMs": 3024,
+     "meshes": 1041,
+     "materials": 89,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 242.4
+    },
+    {
+     "lap": 1,
+     "planet": "zephyria",
+     "swapMs": 2849,
+     "meshes": 1058,
+     "materials": 90,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 37,
+     "transformNodes": 33,
+     "unreadyMaterials": 0,
+     "heapMB": 311.1
+    },
+    {
+     "lap": 1,
+     "planet": "noctaris",
+     "swapMs": 2864,
+     "meshes": 1006,
+     "materials": 88,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 36,
+     "transformNodes": 34,
+     "unreadyMaterials": 0,
+     "heapMB": 376.3
+    },
+    {
+     "lap": 1,
+     "planet": "veyra7",
+     "swapMs": 3984,
+     "meshes": 994,
+     "materials": 85,
+     "textures": 31,
+     "lights": 3,
+     "particleSystems": 35,
+     "transformNodes": 30,
+     "unreadyMaterials": 0,
+     "heapMB": 150.5
+    }
+   ],
+   "leakLap2VsLap1": [
+    {
+     "planet": "aetherion",
+     "dMeshes": 8,
+     "dMaterials": 4,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "kryos",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "pyron",
+     "dMeshes": -1,
+     "dMaterials": 3,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "zephyria",
+     "dMeshes": -3,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "noctaris",
+     "dMeshes": -7,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    },
+    {
+     "planet": "veyra7",
+     "dMeshes": 0,
+     "dMaterials": 0,
+     "dTextures": 0,
+     "dLights": 0
+    }
+   ],
+   "errors": []
+  }
+ ]
+}

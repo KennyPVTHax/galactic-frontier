@@ -11,9 +11,10 @@ export class CameraRig {
   yaw = 0;
   /** + looks down. */
   pitch = 0.25;
-  private distance = 6.5;
-  private desiredDistance = 6.5;
-  private smoothDist = 6.5;
+  /** (test/screenshot scripts set these three to frame close-ups) */
+  distance = 6.5;
+  desiredDistance = 6.5;
+  smoothDist = 6.5;
   private readonly tmp = new Vector3();
   private readonly target = new Vector3();
   private initialized = false;

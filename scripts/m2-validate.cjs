@@ -344,7 +344,9 @@ async function presetsContextSave(browser) {
   // Save → reload → continue; device prefs are separate from the shared save
   await page.evaluate(() => window.__GF.save());
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("orbitbtc.galacticFrontier.presets.main")));
-  check("shared save keeps the M1 schema (version 2, no graphics tier inside)", saved.version === 2 && !JSON.stringify(saved).includes("enhanced"), `keys: ${Object.keys(saved).join(",")}`);
+  // M2 asserted schema v2 here. M4 intentionally moved the shared save to v3 (universe, progression, contracts);
+  // v2 saves still load (see the "M1 save" check below and tests/m6-gameplay.test.ts). Device prefs must stay out of it.
+  check("shared save is the current schema (v4) with no graphics tier inside", saved.version === 4 && !JSON.stringify(saved).includes("enhanced"), `keys: ${Object.keys(saved).join(",")}`);
   await page.goto(`${URL}?debug=1&slot=presets`, { timeout: 240000 });
   await wait(page, () => !!window.__GF, null, 240000);
   await page.click('[data-t="continue"]');

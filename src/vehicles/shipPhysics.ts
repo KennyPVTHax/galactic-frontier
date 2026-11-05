@@ -78,6 +78,8 @@ export class ShipPhysics {
   speed = 0;
   vy = 0;
   throttle = 0;
+  /** Engine upgrade multiplier on cruise/boost speed (1 = M2 handling). */
+  speedScale = 1;
   hull = 100;
   maxHull = 100;
   private transition: Transition | null = null;
@@ -118,6 +120,13 @@ export class ShipPhysics {
   placeLanded(env: ShipEnvironment, x: number, z: number, yaw: number): void {
     Object.assign(this, { x, z, y: env.groundAt(x, z) + GEAR_HEIGHT, yaw, pitch: 0, roll: 0, speed: 0, vy: 0, throttle: 0 });
     this.state = "landed";
+    this.transition = null;
+  }
+
+  /** Drops the ship into free flight (warp arrival). */
+  placeFlying(x: number, y: number, z: number, yaw: number, speed = 0): void {
+    Object.assign(this, { x, y, z, yaw, pitch: 0, roll: 0, speed, vy: 0, throttle: Math.min(1, speed / MAX_SPEED) });
+    this.state = "flying";
     this.transition = null;
   }
 
@@ -228,7 +237,7 @@ export class ShipPhysics {
 
     // --- Speed
     this.throttle = clamp(this.throttle + c.throttle * 0.7 * dt, 0, 1);
-    const target = this.throttle * (c.boost ? BOOST_SPEED : MAX_SPEED);
+    const target = this.throttle * (c.boost ? BOOST_SPEED : MAX_SPEED) * this.speedScale;
     const accel = c.boost ? 55 : 32;
     if (this.speed < target) this.speed = Math.min(target, this.speed + accel * dt);
     else this.speed = Math.max(target, this.speed - 40 * dt);
