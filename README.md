@@ -161,3 +161,6 @@ The smoke test uses debug teleports to skip long flights, and tops up samples af
 - Server-side anti-cheat is plausibility-only (timing, quotas). It is not proof of play; treat rewards accordingly.
 - Built here against Babylon.js 9.33.2 compiled from its official GitHub source, because the npm registry was not reachable from my build machine.
   `npm install` resolves the same version from npm normally.
+
+## M8 — one universe, two visual experiences
+See [docs/M8-REPORT.md](docs/M8-REPORT.md): shared gameplay core, Telegram *Lite* package (`npm run build:telegram`), Android/desktop *Full* package with performance-governed cinematic space, cross-platform progression protocol, parity tests (`npm run test:parity`).
