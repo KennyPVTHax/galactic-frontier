@@ -63,7 +63,7 @@ const packagePlugin = {
       const lite = join(root, "src/engine/babylon.lite.ts");
       b.onResolve({ filter: /(^|\/)engine\/babylon$/ }, (a) => (a.importer === lite ? undefined : { path: lite }));
       // Presentation facades that have a Lite stand-in (src/presentation/<name>.lite.ts).
-      b.onResolve({ filter: /(^|\/)presentation\/cinematic$/ }, () => ({ path: join(root, "src/presentation/cinematic.lite.ts") }));
+      b.onResolve({ filter: /(^|\/)presentation\/(cinematic|astronaut)$/ }, (a) => ({ path: join(root, `src/presentation/${a.path.split("/").pop()}.lite.ts`) }));
     }
   },
 };

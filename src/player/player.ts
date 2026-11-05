@@ -3,7 +3,7 @@ import { clamp, damp, wrapAngle } from "../core/random";
 import { WORLD } from "../core/worldConfig";
 import type { InputFrame } from "../input/input";
 import type { Collider } from "../world/planet";
-import { Astronaut } from "./astronaut";
+import { Astronaut } from "../presentation/astronaut";
 import type { MaterialLibrary } from "../graphics/materials";
 
 export interface PlayerWorld {

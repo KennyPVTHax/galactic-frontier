@@ -63,6 +63,13 @@ test("cinematic deep space exists only in Full", () => {
   assert.ok(full.html.includes("uGalaxyN"), "cinematic shader source is in the Full bundle");
 });
 
+test("the detailed astronaut is Full-only; Lite keeps the original simple one", () => {
+  assert.ok([...F.keys()].some((k) => k.endsWith("src/presentation/full/astronautFull.ts")), "Full ships the detailed astronaut");
+  assert.ok(![...F.keys()].some((k) => k.endsWith("src/player/astronaut.ts")), "Full does not also ship the simple astronaut");
+  assert.ok([...L.keys()].some((k) => k.endsWith("src/player/astronaut.ts")), "Lite ships the simple astronaut");
+  assert.ok(![...L.keys()].some((k) => k.endsWith("astronautFull.ts")), "Lite has no detailed astronaut");
+});
+
 test("Lite is materially smaller than Full", () => {
   const l = total(L), f = total(F);
   console.log(`[bundle] lite ${(l / 1024).toFixed(0)} KB vs full ${(f / 1024).toFixed(0)} KB of input bytes in output (${((1 - l / f) * 100).toFixed(1)}% smaller)`);
