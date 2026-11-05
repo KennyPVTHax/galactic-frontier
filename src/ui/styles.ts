@@ -172,8 +172,8 @@ export function hudCss(t: Theme): string {
 .gf-hud.gf-landscape [data-pos=scan]{--s:1.05;--r:2.1;--b:1.75}
 .gf-hud.gf-landscape [data-pos=sprint]{--s:1;--r:3.6;--b:.3}
 .gf-hud.gf-landscape [data-pos=thr]{--s:1;width:calc(var(--u)*1.15);height:calc(var(--u)*3.6);--r:.35;--b:.35;display:flex;border-radius:18px}
-.gf-hud.gf-landscape [data-pos=thrup]{--s:.95;--r:1.75;--b:2.95;font-size:11px}
-.gf-hud.gf-landscape [data-pos=thrdown]{--s:.95;--r:1.75;--b:1.85;font-size:11px}
+.gf-hud.gf-landscape [data-pos=thrup]{--s:1.08;--r:1.75;--b:2.95;font-size:11px}
+.gf-hud.gf-landscape [data-pos=thrdown]{--s:1.08;--r:1.75;--b:1.85;font-size:11px}
 .gf-hud.gf-landscape [data-pos=boost]{--s:1.25;--r:1.65;--b:.3}
 .gf-hud.gf-landscape [data-pos=up]{--s:1;--r:3.2;--b:1.5}
 .gf-hud.gf-landscape [data-pos=down]{--s:1;--r:3.2;--b:.3}

@@ -1,4 +1,35 @@
-# OrbitBtc · Galactic Frontier — Milestone 2 (landscape & visual fidelity)
+# OrbitBtc · Galactic Frontier — M3–M6 (planets, combat, missions)
+
+Original third-person space exploration game (TypeScript + Babylon.js 9). Built on the verified M2 baseline
+(`galactic-frontier-m2-baseline`). **Start with [docs/M3-M6-REPORT.md](docs/M3-M6-REPORT.md)** for what is playable, the test and
+benchmark numbers, bugs found, and the honest list of what is *not* done (notably: no real-device testing).
+
+- **Six worlds** (Veyra-7 + Aetherion, Kryos, Pyron, Zephyria, Noctaris), star map and warp travel; weather and hazards per planet.
+- **Space combat**: five hostile ship types, explicit AI states, shields/hull, lock-on, squadron and dreadnought-boss logic.
+- **11 contracts**, pilot XP/ranks, achievements, ship upgrades (shield/weapons/engine), cosmetic paints, save schema v3.
+- **Three render tiers**: Telegram Basic · Desktop Enhanced · Android Extreme HD (manual choice in Settings, adaptive resolution).
+- Rewards are virtual in-game resources/XP only. Nothing touches OrbitBtc balances or backend (see `docs/INTEGRATION.md` §11).
+
+```bash
+npm install
+npm run dev                  # http://localhost:5173
+npm run build                # dist/lib + dist/preview/index.html (single playable file) + types
+npm test                     # 60 unit tests (needs no browser)
+npm run build:preview && npm run test:journey   # the 14-step required journey in headless Chromium
+npm run test:browser         # M1 smoke test (unchanged)        npm run test:m2    # M2 suite
+npm run bench                # per-tier benchmark (software GL numbers are comparison-only)
+```
+Headless Chromium note: the browser scripts use the Playwright version pinned in `package.json`. If its browser download is
+unavailable, preload a shim that sets `executablePath` to an installed Chromium.
+
+**New controls:** `M` star map · `J` contracts & pilot log · `LMB` fire in flight · `T` cycle/lock target · touch: **Fire / Target / Map**.
+Preview URL flags (unchanged): `?quality=basic|enhanced|ultra`, `?touch=1`, `?start=new|continue`, `?debug=1` (test helpers; never ship enabled).
+
+---
+
+# Milestone 2 documentation (still accurate)
+
+## Milestone 2 (landscape & visual fidelity)
 
 Galactic Frontier is an original third-person space exploration game (TypeScript + Babylon.js), built as a standalone
 module. M2 is a visual and orientation upgrade on top of the M1 gameplay that the owner tested. Gameplay, missions,

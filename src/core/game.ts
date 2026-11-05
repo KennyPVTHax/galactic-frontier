@@ -169,6 +169,7 @@ export class Game {
   private space: SpaceEnvironment | null = null;
   private combatStats = { shots: 0, hits: 0, kills: 0 };
   private lastHullRatio = 1;
+  private particleTex: ReturnType<typeof makeParticleTexture> | null = null;
   private frontierTab: "contracts" | "pilot" = "contracts";
 
   get planetId(): PlanetId {
@@ -238,6 +239,7 @@ export class Game {
     this.combatRenderer.setBudget(prof.combatFx);
     this.combatRenderer.setPbr(prof.pbr);
     this.space?.setDetail(prof.tier, prof);
+    this.planet.weather?.setBudget(prof.weatherParticles);
     this.combatHud.setTouch(this.input.touchActive);
   }
 
@@ -291,6 +293,7 @@ export class Game {
     this.shipModel = new ShipModel(this.scene, this.materials);
     this.player = new Player(this.scene, this.materials);
     const ptex = makeParticleTexture(this.scene);
+    this.particleTex = ptex;
     this.beam = new LaserBeam(this.scene, ptex, 220);
     this.pulse = new ScanPulse(this.scene);
     const wind = { get x() { return WorldUniforms.wind.x; }, get z() { return WorldUniforms.wind.y; } };
@@ -1325,6 +1328,9 @@ export class Game {
 
   private onEnterPlanet(): void {
     const def = this.planetDef;
+    // Planet weather (snow, blizzard, ash, spores, storms) is owned by the planet and capped per graphics tier.
+    this.planet.createWeather(this.rig.camera, this.particleTex);
+    this.planet.weather?.setBudget(this.currentProfile().weatherParticles);
     this.combat.setPatrols(def.encounters.patrolInterval > 0 ? def.encounters : null, def.danger, upgradeSum(this.levels));
     // Orbital belt: dense around Halcyon Dock, a sparse high-altitude field elsewhere.
     const prof = this.currentProfile();
