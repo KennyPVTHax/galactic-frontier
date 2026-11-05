@@ -911,6 +911,20 @@ export class Planet {
     m.setVerticesData("color", arr);
   }
 
+  /**
+   * Merges procedural parts after normalising their vertex attributes (Babylon refuses to merge
+   * meshes with different attribute sets, e.g. a sphere with UVs and a hand-built mesh without).
+   */
+  private mergeParts(parts: Mesh[]): Mesh {
+    for (const m of parts) {
+      const n = m.getTotalVertices();
+      if (!m.isVerticesDataPresent("uv")) m.setVerticesData("uv", new Array(n * 2).fill(0));
+      if (!m.isVerticesDataPresent("color")) m.setVerticesData("color", new Array(n * 4).fill(1));
+      for (const kind of ["uv2", "tangent", "matricesIndices", "matricesWeights"]) if (m.isVerticesDataPresent(kind)) m.removeVerticesData(kind);
+    }
+    return Mesh.MergeMeshes(parts, true, true)!;
+  }
+
   /** Bakes a part's transform and paints it, ready for merging. */
   private part(m: Mesh, c: V3, tip?: V3): Mesh {
     m.bakeCurrentTransformIntoVertices();
@@ -1692,7 +1706,7 @@ export class Planet {
         pod.position.copyFrom(path[4]);
         parts.push(this.part(pod, [0.85, 1.0, 0.6]));
       }
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-tree-willow${sfx}`;
       out.push(m);
     }
@@ -1708,7 +1722,7 @@ export class Planet {
         tier.position.y = h;
         parts.push(this.part(tier, [0.08, 0.3, 0.28], [0.22, 0.58, 0.44]));
       }
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-tree-parasol${sfx}`;
       out.push(m);
     }
@@ -1728,7 +1742,7 @@ export class Planet {
         ball.bakeCurrentTransformIntoVertices();
         parts.push(ball);
       }
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-tree-bulb${sfx}`;
       out.push(m);
     }
@@ -1741,7 +1755,7 @@ export class Planet {
       fan.position.copyFrom(path[8]);
       fan.bakeCurrentTransformIntoVertices();
       parts.push(fan);
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-tree-fern${sfx}`;
       out.push(m);
     }
@@ -1808,7 +1822,7 @@ export class Planet {
           ic.position.set(-1 + i * 1.1, 4.2 - (i % 3) * 0.3, ((i * 37) % 5) - 2.2);
           parts.push(this.part(ic, [0.8, 0.92, 1]));
         }
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-overhang${lo ? "-lo" : ""}`;
       return m;
     };
@@ -1854,7 +1868,7 @@ export class Planet {
         c.position.set(Math.cos(a) * r, h / 2 - 0.4, Math.sin(a) * r);
         parts.push(this.part(c, [0.12, 0.11, 0.11], [0.3, 0.27, 0.26]));
       }
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-basalt${lo ? "-lo" : ""}`;
       return m;
     };
@@ -1869,7 +1883,7 @@ export class Planet {
       const glow = MeshBuilder.CreateCylinder("gf-vent-glow", { height: 0.2, diameter: 1.0, tessellation: lo ? 6 : 12 }, this.scene);
       glow.position.y = 2.18;
       parts.push(this.part(glow, [1.6, 0.7, 0.2]));
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-vent${lo ? "-lo" : ""}`;
       return m;
     };
@@ -1948,15 +1962,16 @@ export class Planet {
     // Coil stalks: helical stems topped with a glowing bulb.
     const coil = (lo: boolean): Mesh => {
       const parts: Mesh[] = [];
-      const path = Array.from({ length: lo ? 6 : 14 }, (_, i, a) => {
-        const t = i / (a.length - 1);
+      const steps = lo ? 6 : 14;
+      const path = Array.from({ length: steps }, (_, i) => {
+        const t = i / (steps - 1);
         return new Vector3(Math.cos(t * 12) * 0.35 * (1 - t * 0.5), t * 4.5, Math.sin(t * 12) * 0.35 * (1 - t * 0.5));
       });
       parts.push(this.tubeMesh(`gf-coil-stem${lo ? "-lo" : ""}`, path, (t) => 0.16 - t * 0.08, lo ? 4 : 6, [0.2, 0.5, 0.55], [0.85, 0.5, 0.8]));
       const bulb = MeshBuilder.CreateSphere("gf-coil-bulb", { diameter: 0.9, segments: lo ? 3 : 6 }, this.scene);
       bulb.position.y = 4.7;
       parts.push(this.part(bulb, [1, 0.75, 0.95]));
-      const m = Mesh.MergeMeshes(parts, true, true)!;
+      const m = this.mergeParts(parts);
       m.name = `gf-coil${lo ? "-lo" : ""}`;
       return m;
     };

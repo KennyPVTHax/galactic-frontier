@@ -247,6 +247,10 @@ export class CombatSystem {
   leadPoint(): Vec3 | null {
     return this.hasLead ? this.lead : null;
   }
+  /** Last player position fed to update() (read-only view for the renderer). */
+  get playerPosition(): Vec3 {
+    return this.ppos;
+  }
   get playerShield(): number {
     return this.shield.shield;
   }
