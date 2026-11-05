@@ -1,0 +1,8 @@
+{
+  "name": "GF.Editor",
+  "rootNamespace": "GF.EditorTools",
+  "references": ["GF.Runtime", "Unity.InputSystem", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime", "Unity.Mathematics"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "autoReferenced": false
+}
