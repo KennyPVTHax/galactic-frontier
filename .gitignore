@@ -13,3 +13,12 @@ android/build/
 android/app/build/
 android/local.properties
 *.apk
+
+# === Claude Code Game Studios (local runtime state; see .claude/FRAMEWORK-SOURCE.md) ===
+.claude/settings.local.json
+CLAUDE.local.md
+project.local.yaml
+production/session-logs/
+production/session-state/
+.scratch/
+.claude/agent-memory/

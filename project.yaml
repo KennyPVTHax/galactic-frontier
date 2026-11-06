@@ -1,0 +1,52 @@
+# CCGS project configuration — single source of truth for studio behaviour.
+# Framework: Claude Code Game Studios v1.2.0 (see .claude/FRAMEWORK-SOURCE.md).
+# Per-developer preferences belong in project.local.yaml (gitignored), not here.
+#
+# Deliberately NOT set here (see the template's own note): modes.review_mode, modes.workflow, docs.density,
+# qa.level, modes.story_granularity, team.size — they are fronted by modes.rigor.
+# `/start` or `/settings` may adjust modes.rigor; platform.multiplayer is left UNSET on purpose (unset != false)
+# until the networking architecture is designed and approved.
+
+schema_version: 1
+
+framework:
+  version: 1.2.0
+  last_upgraded: 2026-11-06
+
+project:
+  name: "Galactic Frontier"
+  genre: "Open-world sci-fi exploration RPG"
+  kind: game
+
+modes:
+  rigor: minimal             # lightweight by default; raise per-system for critical work (e.g. save data, economy)
+  automation: collaborative  # agents ask before writing
+
+engine:
+  name: "Unity"
+  version: "6000.3.28f1"     # Unity 6.3 LTS — from unity/ProjectSettings/ProjectVersion.txt
+  language: "C#"
+  rendering: "URP 17.3.0"
+  code_root: "unity/Assets"   # local patch (.claude/local-patches/apply-code-root-override.sh): the Unity project is in unity/
+  physics: "PhysX (built-in)"
+
+specialists:
+  code: "unity-specialist"
+  shader: "unity-shader-specialist"
+  ui: "unity-ui-specialist"
+  additional: ["unity-addressables-specialist"]   # unity-dots-specialist available; add only if DOTS is adopted
+
+platform:
+  targets: [PC, Mobile]      # Windows PC + Android
+  primary_input: "Keyboard/Mouse + Touch"
+  touch_support: "Full"
+
+testing:
+  framework: "unity-test-framework"   # com.unity.test-framework 1.6.0; EditMode tests in unity/Assets/Tests/EditMode
+
+# Stay local: no outbound update-check request from the session-start hook.
+updates:
+  check: false
+
+features:
+  session_state: on
